@@ -24,15 +24,26 @@ interface SplitSettlementTabProps {
   isLoading: boolean;
 }
 
+const DEFAULT_SPLIT_SUMMARY: SplitSummary = {
+  zhouOwesLiao: 0,
+  liaoOwesZhou: 0,
+  netDebtor: 'none',
+  netAmount: 0,
+  summaryText: '目前雙方已結清 💖',
+  unsettledCount: 0,
+  settledCount: 0,
+};
+
 export const SplitSettlementTab: React.FC<SplitSettlementTabProps> = ({
-  summary,
+  summary = DEFAULT_SPLIT_SUMMARY,
   items = [],
   onOpenSettleModal,
   isLoading,
 }) => {
-  const safeItems = items || [];
-  const unsettledItems = safeItems.filter(i => i.status === '未結清');
-  const settledItems = safeItems.filter(i => i.status === '已結清');
+  const safeSummary: SplitSummary = summary || DEFAULT_SPLIT_SUMMARY;
+  const safeItems = Array.isArray(items) ? items.filter(Boolean) : [];
+  const unsettledItems = safeItems.filter(i => i && i.status === '未結清');
+  const settledItems = safeItems.filter(i => i && i.status === '已結清');
   const [showSettledList, setShowSettledList] = useState(false);
 
   return (
@@ -50,7 +61,7 @@ export const SplitSettlementTab: React.FC<SplitSettlementTabProps> = ({
             </p>
           </div>
 
-          {summary.unsettledCount > 0 && (
+          {(safeSummary.unsettledCount || 0) > 0 && (
             <button
               type="button"
               onClick={onOpenSettleModal}
@@ -85,7 +96,7 @@ export const SplitSettlementTab: React.FC<SplitSettlementTabProps> = ({
               <span className="text-[10px] bg-sky-100 px-1.5 py-0.5 rounded text-sky-700">廖出錢</span>
             </div>
             <div className="text-xl sm:text-2xl font-black text-sky-900">
-              NT$ {summary.zhouOwesLiao.toLocaleString()}
+              NT$ {(safeSummary.zhouOwesLiao || 0).toLocaleString()}
             </div>
             <div className="text-[10px] text-sky-700">（周周 應返還此筆）</div>
           </div>
@@ -105,7 +116,7 @@ export const SplitSettlementTab: React.FC<SplitSettlementTabProps> = ({
               <span className="text-[10px] bg-rose-100 px-1.5 py-0.5 rounded text-rose-700">周出錢</span>
             </div>
             <div className="text-xl sm:text-2xl font-black text-rose-900">
-              NT$ {summary.liaoOwesZhou.toLocaleString()}
+              NT$ {(safeSummary.liaoOwesZhou || 0).toLocaleString()}
             </div>
             <div className="text-[10px] text-rose-700">（廖廖 應返還此筆）</div>
           </div>
@@ -113,7 +124,7 @@ export const SplitSettlementTab: React.FC<SplitSettlementTabProps> = ({
 
         {/* 最終淨額結算結果 */}
         <div className={`p-5 rounded-2xl border text-center space-y-2 ${
-          summary.netDebtor === 'none'
+          safeSummary.netDebtor === 'none'
             ? 'bg-emerald-50/70 border-emerald-200 text-emerald-950'
             : 'bg-[#FAF8F5] border-[#E8E2D5] text-[#3E3A36]'
         }`}>
@@ -121,7 +132,7 @@ export const SplitSettlementTab: React.FC<SplitSettlementTabProps> = ({
             抵銷後最終淨返還結果
           </div>
 
-          {summary.netDebtor === 'none' ? (
+          {safeSummary.netDebtor === 'none' ? (
             <div className="py-2">
               <div className="text-2xl sm:text-3xl font-black text-emerald-800 flex items-center justify-center gap-2">
                 <span>目前雙方已結清 💖</span>
@@ -133,10 +144,10 @@ export const SplitSettlementTab: React.FC<SplitSettlementTabProps> = ({
           ) : (
             <div className="py-2 space-y-1.5">
               <div className="text-sm font-bold text-[#6E6659]">
-                由 <span className="font-black text-[#3E3A36] text-base px-2 py-0.5 rounded bg-white border border-black/5 shadow-2xs">{summary.netDebtor === '廖' ? '廖廖' : '周周'}</span> 支付給 <span className="font-black text-[#3E3A36] text-base px-2 py-0.5 rounded bg-white border border-black/5 shadow-2xs">{summary.netDebtor === '廖' ? '周周' : '廖廖'}</span>
+                由 <span className="font-black text-[#3E3A36] text-base px-2 py-0.5 rounded bg-white border border-black/5 shadow-2xs">{safeSummary.netDebtor === '廖' ? '廖廖' : '周周'}</span> 支付給 <span className="font-black text-[#3E3A36] text-base px-2 py-0.5 rounded bg-white border border-black/5 shadow-2xs">{safeSummary.netDebtor === '廖' ? '周周' : '廖廖'}</span>
               </div>
               <div className="text-3xl sm:text-4xl font-black text-rose-600 tracking-tight">
-                NT$ {summary.netAmount.toLocaleString()} 元
+                NT$ {(safeSummary.netAmount || 0).toLocaleString()} 元
               </div>
               <p className="text-xs text-[#8C8475] max-w-md mx-auto pt-1">
                 依此金額進行轉帳或現金交付後，點擊下方「確認已全數結清」即可將帳目歸檔清零。
@@ -144,7 +155,7 @@ export const SplitSettlementTab: React.FC<SplitSettlementTabProps> = ({
             </div>
           )}
 
-          {summary.unsettledCount > 0 && (
+          {(safeSummary.unsettledCount || 0) > 0 && (
             <div className="pt-3">
               <button
                 type="button"
@@ -176,7 +187,12 @@ export const SplitSettlementTab: React.FC<SplitSettlementTabProps> = ({
         ) : (
           <div className="space-y-2.5">
             {unsettledItems.map((item) => {
-              const debtorAmt = item.debtorAmount || (item.splitMode === 'AA平分' ? Math.round(item.totalAmount / 2) : item.totalAmount);
+              const totalAmt = Number(item.totalAmount) || 0;
+              const debtorAmt = Number(item.debtorAmount) || (item.splitMode === 'AA平分' ? Math.round(totalAmt / 2) : totalAmt);
+              const dateDisplay = item.time ? String(item.time).split(' ')[0] : '—';
+              const payerLabel = item.payer === '廖' ? '廖' : '周';
+              const debtorLabel = item.debtor || (item.payer === '廖' ? '周' : '廖');
+
               return (
                 <div
                   key={item.id}
@@ -186,21 +202,21 @@ export const SplitSettlementTab: React.FC<SplitSettlementTabProps> = ({
                     <span className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-[11px] shrink-0 ${
                       item.payer === '廖' ? 'bg-sky-100 text-sky-800' : 'bg-rose-100 text-rose-800'
                     }`}>
-                      {item.payer}
+                      {payerLabel}
                     </span>
                     <div className="min-w-0">
-                      <div className="font-bold text-[#3E3A36] truncate">{item.itemName}</div>
+                      <div className="font-bold text-[#3E3A36] truncate">{item.itemName || '未命名款項'}</div>
                       <div className="text-[10px] text-[#8C8475]">
-                        總額 ${item.totalAmount} • {item.splitMode}
+                        總額 ${(Number(totalAmt) || 0).toLocaleString()} • {item.splitMode || 'AA平分'}
                       </div>
                     </div>
                   </div>
 
                   <div className="text-right shrink-0">
                     <div className="font-bold text-rose-700">
-                      {item.debtor} 還 ${debtorAmt}
+                      {debtorLabel} 還 ${(Number(debtorAmt) || 0).toLocaleString()}
                     </div>
-                    <div className="text-[10px] text-[#A8A296]">{item.time.split(' ')[0]}</div>
+                    <div className="text-[10px] text-[#A8A296]">{dateDisplay}</div>
                   </div>
                 </div>
               );
@@ -235,11 +251,11 @@ export const SplitSettlementTab: React.FC<SplitSettlementTabProps> = ({
                 >
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    <span className="font-bold text-[#3E3A36]">{item.itemName}</span>
-                    <span className="text-[10px] text-[#8C8475]">(${item.totalAmount})</span>
+                    <span className="font-bold text-[#3E3A36]">{item.itemName || '款項'}</span>
+                    <span className="text-[10px] text-[#8C8475]">(${(Number(item.totalAmount) || 0).toLocaleString()})</span>
                   </div>
                   <div className="text-[10px] text-[#A8A296]">
-                    ✅ 結清於：{item.settledTime || item.time}
+                    ✅ 結清於：{item.settledTime || item.time || '—'}
                   </div>
                 </div>
               ))

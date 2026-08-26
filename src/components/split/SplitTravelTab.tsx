@@ -284,7 +284,22 @@ export const SplitTravelTab: React.FC<SplitTravelTabProps> = ({
 
   useEffect(() => {
     fetchTravelDataFromGas(true);
-  }, [fetchTravelDataFromGas]);
+
+    const handleExternalUpdate = (e: any) => {
+      if (e?.detail) {
+        if (Array.isArray(e.detail.trips)) {
+          setTrips(e.detail.trips);
+          if (e.detail.trips.length > 0 && !e.detail.trips.some((t: any) => t.id === activeTripId)) {
+            setActiveTripId(e.detail.trips[0].id);
+          }
+        }
+        if (Array.isArray(e.detail.expenses)) setExpenses(e.detail.expenses);
+        if (Array.isArray(e.detail.wishlist)) setWishlist(e.detail.wishlist);
+      }
+    };
+    window.addEventListener('travel-data-updated', handleExternalUpdate);
+    return () => window.removeEventListener('travel-data-updated', handleExternalUpdate);
+  }, [fetchTravelDataFromGas, activeTripId]);
 
   // 狀態管理
   const [subTab, setSubTab] = useState<'expenses' | 'wishlist' | 'settlement'>('expenses');
@@ -464,12 +479,10 @@ export const SplitTravelTab: React.FC<SplitTravelTabProps> = ({
 
       if (callGasApi) {
         callGasApi('saveTravelTrip', targetTrip).then(res => {
-          if (!res || !res.success) {
-            enqueueSyncItem?.('saveTravelTrip', targetTrip, `更新旅程：${targetTrip.title}`);
+          if (res?.success) {
+            fetchTravelDataFromGas(true);
           }
-        }).catch(() => {
-          enqueueSyncItem?.('saveTravelTrip', targetTrip, `更新旅程：${targetTrip.title}`);
-        });
+        }).catch(() => {});
       }
     } else {
       // 新建行程
@@ -496,12 +509,10 @@ export const SplitTravelTab: React.FC<SplitTravelTabProps> = ({
 
       if (callGasApi) {
         callGasApi('saveTravelTrip', newTrip).then(res => {
-          if (!res || !res.success) {
-            enqueueSyncItem?.('saveTravelTrip', newTrip, `建立旅程：${newTrip.title}`);
+          if (res?.success) {
+            fetchTravelDataFromGas(true);
           }
-        }).catch(() => {
-          enqueueSyncItem?.('saveTravelTrip', newTrip, `建立旅程：${newTrip.title}`);
-        });
+        }).catch(() => {});
       }
     }
   };
@@ -538,12 +549,10 @@ export const SplitTravelTab: React.FC<SplitTravelTabProps> = ({
 
     if (callGasApi) {
       callGasApi('deleteTravelTrip', { id: targetId }).then(res => {
-        if (!res || !res.success) {
-          enqueueSyncItem?.('deleteTravelTrip', { id: targetId }, `刪除旅程：${targetTitle}`);
+        if (res?.success) {
+          fetchTravelDataFromGas(true);
         }
-      }).catch(() => {
-        enqueueSyncItem?.('deleteTravelTrip', { id: targetId }, `刪除旅程：${targetTitle}`);
-      });
+      }).catch(() => {});
     }
   };
 
@@ -650,16 +659,14 @@ export const SplitTravelTab: React.FC<SplitTravelTabProps> = ({
     const updated = [newExpense, ...expenses];
     saveExpenses(updated);
     setIsAddExpenseOpen(false);
-    showToast(`已新增旅費：${newExpense.itemName}（NT$ ${totalTWD.toLocaleString()}）`, 'success');
+    showToast(`已新增旅費：${newExpense.itemName}（NT$ ${(Number(totalTWD) || 0).toLocaleString()}）`, 'success');
 
     if (callGasApi) {
       callGasApi('addTravelExpense', newExpense).then(res => {
-        if (!res || !res.success) {
-          enqueueSyncItem?.('addTravelExpense', newExpense, `新增旅費：${newExpense.itemName}`);
+        if (res?.success) {
+          fetchTravelDataFromGas(true);
         }
-      }).catch(() => {
-        enqueueSyncItem?.('addTravelExpense', newExpense, `新增旅費：${newExpense.itemName}`);
-      });
+      }).catch(() => {});
     }
   };
 
@@ -670,7 +677,7 @@ export const SplitTravelTab: React.FC<SplitTravelTabProps> = ({
     setDeleteConfirmState({
       isOpen: true,
       title: '刪除支出明細',
-      message: `確定要刪除「${target.itemName}」（NT$ ${target.totalAmountTWD.toLocaleString()}）嗎？`,
+      message: `確定要刪除「${target.itemName}」（NT$ ${(Number(target.totalAmountTWD) || 0).toLocaleString()}）嗎？`,
       confirmText: '確定刪除',
       dangerLevel: 'danger',
       onConfirm: () => {
@@ -681,12 +688,10 @@ export const SplitTravelTab: React.FC<SplitTravelTabProps> = ({
 
         if (callGasApi) {
           callGasApi('deleteTravelExpense', { id: expId }).then(res => {
-            if (!res || !res.success) {
-              enqueueSyncItem?.('deleteTravelExpense', { id: expId }, `刪除旅費：${target.itemName}`);
+            if (res?.success) {
+              fetchTravelDataFromGas(true);
             }
-          }).catch(() => {
-            enqueueSyncItem?.('deleteTravelExpense', { id: expId }, `刪除旅費：${target.itemName}`);
-          });
+          }).catch(() => {});
         }
       }
     });
@@ -792,11 +797,11 @@ export const SplitTravelTab: React.FC<SplitTravelTabProps> = ({
       if (liaoNet > 0 && zhouNet < 0) {
         coupleNetDebtor = '周';
         coupleNetAmount = Math.round(liaoNet);
-        coupleResultText = `👧 周周 應返還 廖廖 NT$ ${coupleNetAmount.toLocaleString()}`;
+        coupleResultText = `👧 周周 應返還 廖廖 NT$ ${(Number(coupleNetAmount) || 0).toLocaleString()}`;
       } else if (zhouNet > 0 && liaoNet < 0) {
         coupleNetDebtor = '廖';
         coupleNetAmount = Math.round(zhouNet);
-        coupleResultText = `👦 廖廖 應返還 周周 NT$ ${coupleNetAmount.toLocaleString()}`;
+        coupleResultText = `👦 廖廖 應返還 周周 NT$ ${(Number(coupleNetAmount) || 0).toLocaleString()}`;
       }
     }
 
@@ -849,12 +854,10 @@ export const SplitTravelTab: React.FC<SplitTravelTabProps> = ({
 
     if (callGasApi) {
       callGasApi('addTravelWishItem', newWish).then(res => {
-        if (!res || !res.success) {
-          enqueueSyncItem?.('addTravelWishItem', newWish, `新增心願：${newWish.itemName}`);
+        if (res?.success) {
+          fetchTravelDataFromGas(true);
         }
-      }).catch(() => {
-        enqueueSyncItem?.('addTravelWishItem', newWish, `新增心願：${newWish.itemName}`);
-      });
+      }).catch(() => {});
     }
   };
 
@@ -868,12 +871,10 @@ export const SplitTravelTab: React.FC<SplitTravelTabProps> = ({
 
     if (callGasApi) {
       callGasApi('toggleTravelWishStatus', { id: item.id, status: nextStatus }).then(res => {
-        if (!res || !res.success) {
-          enqueueSyncItem?.('toggleTravelWishStatus', { id: item.id, status: nextStatus }, `更新心願狀態：${item.itemName}`);
+        if (res?.success) {
+          fetchTravelDataFromGas(true);
         }
-      }).catch(() => {
-        enqueueSyncItem?.('toggleTravelWishStatus', { id: item.id, status: nextStatus }, `更新心願狀態：${item.itemName}`);
-      });
+      }).catch(() => {});
     }
   };
 
@@ -894,12 +895,10 @@ export const SplitTravelTab: React.FC<SplitTravelTabProps> = ({
 
         if (callGasApi) {
           callGasApi('deleteTravelWishItem', { id: wishId }).then(res => {
-            if (!res || !res.success) {
-              enqueueSyncItem?.('deleteTravelWishItem', { id: wishId }, `刪除心願：${target.itemName}`);
+            if (res?.success) {
+              fetchTravelDataFromGas(true);
             }
-          }).catch(() => {
-            enqueueSyncItem?.('deleteTravelWishItem', { id: wishId }, `刪除心願：${target.itemName}`);
-          });
+          }).catch(() => {});
         }
       }
     });
@@ -926,18 +925,18 @@ export const SplitTravelTab: React.FC<SplitTravelTabProps> = ({
       `✈️【${activeTrip.title}】旅行結算帳單 📊`,
       `📅 期間：${activeTrip.startDate} ~ ${activeTrip.endDate} (${activeTrip.destination})`,
       `👥 出遊成員：${tripMembers.join('、')}`,
-      `💰 總旅費支出：NT$ ${tripSummary.totalTWD.toLocaleString()} 元 (人均 NT$ ${tripSummary.perPersonAverage.toLocaleString()})`,
+      `💰 總旅費支出：NT$ ${(Number(tripSummary.totalTWD) || 0).toLocaleString()} 元 (人均 NT$ ${(Number(tripSummary.perPersonAverage) || 0).toLocaleString()})`,
       `------------------------`,
       `💳 各成員先代墊金額：`,
-      ...tripMembers.map(m => `• ${m} 先付：NT$ ${(tripSummary.memberPaid[m] || 0).toLocaleString()} (實應負擔 NT$ ${(tripSummary.memberShare[m] || 0).toLocaleString()})`),
+      ...tripMembers.map(m => `• ${m} 先付：NT$ ${(Number(tripSummary.memberPaid[m]) || 0).toLocaleString()} (實應負擔 NT$ ${(Number(tripSummary.memberShare[m]) || 0).toLocaleString()})`),
       `------------------------`,
       `🎯 結清平帳還款清單：`,
       ...(tripSummary.transactions.length > 0 
-        ? tripSummary.transactions.map(t => `👉 ${t.from} 應支付給 ${t.to}：NT$ ${t.amount.toLocaleString()}`)
+        ? tripSummary.transactions.map(t => `👉 ${t.from} 應支付給 ${t.to}：NT$ ${(Number(t.amount) || 0).toLocaleString()}`)
         : ['✨ 所有成員分攤皆已完全平衡，無須轉帳！']),
       `------------------------`,
       `📝 類別開銷明細：`,
-      ...Object.entries(tripSummary.categoryBreakdown).map(([cat, amt]) => `• ${cat}：NT$ ${(amt as number).toLocaleString()} (${Math.round(((amt as number) / (tripSummary.totalTWD || 1)) * 100)}%)`),
+      ...Object.entries(tripSummary.categoryBreakdown).map(([cat, amt]) => `• ${cat}：NT$ ${(Number(amt) || 0).toLocaleString()} (${Math.round(((Number(amt) || 0) / (tripSummary.totalTWD || 1)) * 100)}%)`),
       `\n✨ 由 伴伴記帳 甜蜜生活記帳本自動產生`
     ];
 
@@ -958,7 +957,7 @@ export const SplitTravelTab: React.FC<SplitTravelTabProps> = ({
       itemName: `✈️ ${activeTrip?.title || '旅行'} 總結算平帳款`,
       totalAmount: tripSummary.coupleNetAmount * 2 // 轉入日常代墊 (AA 平分後應返還 coupleNetAmount)
     });
-    showToast(`🎉 已成功將旅行分帳 NT$ ${tripSummary.coupleNetAmount.toLocaleString()} 匯入日常代墊！`, 'success');
+    showToast(`🎉 已成功將旅行分帳 NT$ ${(Number(tripSummary.coupleNetAmount) || 0).toLocaleString()} 匯入日常代墊！`, 'success');
   };
 
   // 支出分類篩選
@@ -1386,7 +1385,7 @@ export const SplitTravelTab: React.FC<SplitTravelTabProps> = ({
                 <span>預算使用率 ({tripSummary.budgetUsagePercent}%)</span>
               </span>
               <span>
-                NT$ {tripSummary.totalTWD.toLocaleString()} / {activeTrip.budgetTWD.toLocaleString()} (剩餘 NT$ {Math.max(0, activeTrip.budgetTWD - tripSummary.totalTWD).toLocaleString()})
+                NT$ {(Number(tripSummary.totalTWD) || 0).toLocaleString()} / {(Number(activeTrip.budgetTWD) || 0).toLocaleString()} (剩餘 NT$ {Math.max(0, (Number(activeTrip.budgetTWD) || 0) - (Number(tripSummary.totalTWD) || 0)).toLocaleString()})
               </span>
             </div>
             <div className="w-full h-2 rounded-full bg-black/25 overflow-hidden">
@@ -1415,11 +1414,11 @@ export const SplitTravelTab: React.FC<SplitTravelTabProps> = ({
             </span>
           </div>
           <div className="text-2xl sm:text-3xl font-black text-[#3E3A36]">
-            NT$ {tripSummary.totalTWD.toLocaleString()}
+            NT$ {(Number(tripSummary.totalTWD) || 0).toLocaleString()}
           </div>
           <div className="text-xs text-[#7A7366] flex items-center justify-between pt-1 border-t border-[#F0ECE1]">
             <span>{tripMembers.length} 位成員人均：</span>
-            <span className="font-bold text-rose-700">NT$ {tripSummary.perPersonAverage.toLocaleString()}</span>
+            <span className="font-bold text-rose-700">NT$ {(Number(tripSummary.perPersonAverage) || 0).toLocaleString()}</span>
           </div>
         </div>
 
@@ -1441,7 +1440,7 @@ export const SplitTravelTab: React.FC<SplitTravelTabProps> = ({
                   <span>{m} 先出：</span>
                 </span>
                 <span className="font-black text-[#3E3A36]">
-                  NT$ {(tripSummary.memberPaid[m] || 0).toLocaleString()}
+                  NT$ {(Number(tripSummary.memberPaid?.[m]) || 0).toLocaleString()}
                 </span>
               </div>
             ))}
@@ -1472,7 +1471,7 @@ export const SplitTravelTab: React.FC<SplitTravelTabProps> = ({
                 tripSummary.transactions.slice(0, 2).map((t, idx) => (
                   <div key={idx} className="text-xs font-black text-[#3E3A36] flex items-center justify-between bg-white/70 px-2.5 py-1 rounded-lg">
                     <span>👉 {t.from} 應支付 {t.to}</span>
-                    <span className="text-rose-700">NT$ {t.amount.toLocaleString()}</span>
+                    <span className="text-rose-700">NT$ {(Number(t.amount) || 0).toLocaleString()}</span>
                   </div>
                 ))
               ) : (
@@ -1642,7 +1641,7 @@ export const SplitTravelTab: React.FC<SplitTravelTabProps> = ({
                           )}
                           {exp.originalCurrency !== 'TWD' && (
                             <span className="text-amber-700 font-semibold">
-                              (原幣: {CURRENCY_DEFAULTS[exp.originalCurrency]?.symbol || ''} {exp.originalAmount.toLocaleString()} {exp.originalCurrency} @ {exp.exchangeRate})
+                              (原幣: {CURRENCY_DEFAULTS[exp.originalCurrency]?.symbol || ''} {(Number(exp.originalAmount) || 0).toLocaleString()} {exp.originalCurrency} @ {exp.exchangeRate})
                             </span>
                           )}
                         </div>
@@ -1658,11 +1657,11 @@ export const SplitTravelTab: React.FC<SplitTravelTabProps> = ({
                     <div className="flex sm:flex-col items-center sm:items-end justify-between border-t sm:border-t-0 pt-2 sm:pt-0 border-[#F2ECE1] shrink-0 gap-1">
                       <div className="text-right">
                         <div className="text-base sm:text-lg font-black text-[#3E3A36]">
-                          NT$ {exp.totalAmountTWD.toLocaleString()}
+                          NT$ {(Number(exp.totalAmountTWD) || 0).toLocaleString()}
                         </div>
                         {exp.debtorAmountTWD > 0 && (
                           <div className="text-[11px] font-bold text-rose-700">
-                            其他成員分攤 NT$ {exp.debtorAmountTWD.toLocaleString()}
+                            其他成員分攤 NT$ {(Number(exp.debtorAmountTWD) || 0).toLocaleString()}
                           </div>
                         )}
                       </div>
@@ -1735,8 +1734,8 @@ export const SplitTravelTab: React.FC<SplitTravelTabProps> = ({
                     />
                   </div>
                   <div className="flex items-center justify-between text-[11px] text-[#8C8475] pt-0.5">
-                    <span>心願預估總額：NT$ {totalEstimatedAmount.toLocaleString()}</span>
-                    <span>已完成預訂：NT$ {doneEstimatedAmount.toLocaleString()}</span>
+                    <span>心願預估總額：NT$ {(Number(totalEstimatedAmount) || 0).toLocaleString()}</span>
+                    <span>已完成預訂：NT$ {(Number(doneEstimatedAmount) || 0).toLocaleString()}</span>
                   </div>
                 </div>
               )}
@@ -1779,9 +1778,9 @@ export const SplitTravelTab: React.FC<SplitTravelTabProps> = ({
                             {w.category}
                           </span>
                           <span>提議人：{w.addedBy}</span>
-                          {w.estimatedAmountTWD && (
+                          {w.estimatedAmountTWD !== undefined && w.estimatedAmountTWD !== null && (
                             <span className="font-bold text-[#5C564E]">
-                              預估: NT$ {w.estimatedAmountTWD.toLocaleString()}
+                              預估: NT$ {(Number(w.estimatedAmountTWD) || 0).toLocaleString()}
                             </span>
                           )}
                         </div>
@@ -1856,7 +1855,7 @@ export const SplitTravelTab: React.FC<SplitTravelTabProps> = ({
                         </div>
                       </div>
                       <div className="text-sm font-black text-rose-700">
-                        NT$ {t.amount.toLocaleString()}
+                        NT$ {(Number(t.amount) || 0).toLocaleString()}
                       </div>
                     </div>
                   ))}
@@ -1872,18 +1871,18 @@ export const SplitTravelTab: React.FC<SplitTravelTabProps> = ({
                 <div className="text-[11px] font-bold text-[#7A7366]">成員收支結餘表：</div>
                 <div className="space-y-1.5">
                   {tripMembers.map(m => {
-                    const paid = tripSummary.memberPaid[m] || 0;
-                    const share = tripSummary.memberShare[m] || 0;
-                    const net = (tripSummary.netBalances[m] || 0);
+                    const paid = Number(tripSummary.memberPaid?.[m]) || 0;
+                    const share = Number(tripSummary.memberShare?.[m]) || 0;
+                    const net = Number(tripSummary.netBalances?.[m]) || 0;
 
                     return (
                       <div key={m} className="flex items-center justify-between text-xs py-1 px-2 rounded-lg bg-stone-50">
                         <span className="font-bold text-[#3E3A36]">{m}</span>
                         <div className="flex items-center gap-3 text-[11px]">
-                          <span className="text-[#8C8475]">先墊 ${paid.toLocaleString()}</span>
-                          <span className="text-[#8C8475]">應付 ${share.toLocaleString()}</span>
+                          <span className="text-[#8C8475]">先墊 ${(Number(paid) || 0).toLocaleString()}</span>
+                          <span className="text-[#8C8475]">應付 ${(Number(share) || 0).toLocaleString()}</span>
                           <span className={`font-black ${net >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                            {net >= 0 ? `應收 +$${net.toLocaleString()}` : `應付 -$${Math.abs(net).toLocaleString()}`}
+                            {net >= 0 ? `應收 +$${(Number(net) || 0).toLocaleString()}` : `應付 -$${(Number(Math.abs(net)) || 0).toLocaleString()}`}
                           </span>
                         </div>
                       </div>
@@ -1901,8 +1900,8 @@ export const SplitTravelTab: React.FC<SplitTravelTabProps> = ({
               </h4>
 
               <div className="space-y-2.5">
-                {Object.entries(tripSummary.categoryBreakdown).map(([cat, amtVal]) => {
-                  const amt = amtVal as number;
+                {Object.entries(tripSummary.categoryBreakdown || {}).map(([cat, amtVal]) => {
+                  const amt = Number(amtVal) || 0;
                   const percent = Math.round((amt / (tripSummary.totalTWD || 1)) * 100);
                   const conf = CATEGORY_CONFIG[cat] || CATEGORY_CONFIG['其他雜支'];
                   return (
@@ -1910,7 +1909,7 @@ export const SplitTravelTab: React.FC<SplitTravelTabProps> = ({
                       <div className="flex items-center justify-between text-xs">
                         <span className="font-bold text-[#5C564E]">{cat}</span>
                         <span className="font-bold text-[#3E3A36]">
-                          NT$ {amt.toLocaleString()} ({percent}%)
+                          NT$ {(Number(amt) || 0).toLocaleString()} ({percent}%)
                         </span>
                       </div>
                       <div className="w-full h-2 rounded-full bg-[#F2EEE6] overflow-hidden">
@@ -2419,7 +2418,7 @@ export const SplitTravelTab: React.FC<SplitTravelTabProps> = ({
                         <span>NT$</span>
                         <span>
                           {expOriginalAmount && !isNaN(parseFloat(expOriginalAmount))
-                            ? Math.round(parseFloat(expOriginalAmount) * (parseFloat(expRate) || 1)).toLocaleString()
+                            ? (Number(Math.round(parseFloat(expOriginalAmount) * (parseFloat(expRate) || 1))) || 0).toLocaleString()
                             : '0'}
                         </span>
                       </div>
@@ -2444,7 +2443,7 @@ export const SplitTravelTab: React.FC<SplitTravelTabProps> = ({
                         }}
                         className="px-2 py-0.5 rounded-lg bg-white hover:bg-rose-50 text-[#5C564E] hover:text-rose-700 text-[10px] font-bold border border-[#DDD8CD] transition-colors cursor-pointer active:scale-95 shadow-2xs"
                       >
-                        +{amt.toLocaleString()}
+                        +{(Number(amt) || 0).toLocaleString()}
                       </button>
                     ))}
                     <button
@@ -2678,7 +2677,7 @@ export const SplitTravelTab: React.FC<SplitTravelTabProps> = ({
                         }}
                         className="px-2 py-0.5 rounded-lg bg-white hover:bg-rose-50 text-[#5C564E] hover:text-rose-700 text-[10px] font-bold border border-[#DDD8CD] transition-colors cursor-pointer active:scale-95 shadow-2xs"
                       >
-                        +{amt.toLocaleString()}
+                        +{(Number(amt) || 0).toLocaleString()}
                       </button>
                     ))}
                   </div>

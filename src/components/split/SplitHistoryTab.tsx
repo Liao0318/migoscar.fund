@@ -28,7 +28,7 @@ export const SplitHistoryTab: React.FC<SplitHistoryTabProps> = ({
   onDeleteItem,
   onOpenAdd,
 }) => {
-  const safeItems = items || [];
+  const safeItems = Array.isArray(items) ? items.filter(Boolean) : [];
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'unsettled' | 'settled'>('ALL');
   const [filterPayer, setFilterPayer] = useState<'ALL' | '廖' | '周'>('ALL');
   const [filterDebtor, setFilterDebtor] = useState<'ALL' | '廖' | '周'>('ALL');
@@ -39,6 +39,7 @@ export const SplitHistoryTab: React.FC<SplitHistoryTabProps> = ({
 
   const filteredItems = safeItems
     .filter((item) => {
+      if (!item) return false;
       if (filterStatus === 'unsettled' && item.status !== '未結清') return false;
       if (filterStatus === 'settled' && item.status !== '已結清') return false;
       if (filterPayer !== 'ALL' && item.payer !== filterPayer) return false;
@@ -46,50 +47,58 @@ export const SplitHistoryTab: React.FC<SplitHistoryTabProps> = ({
       
       // 日期範圍篩選
       if (startDate) {
-        const itemDate = item.time ? item.time.substring(0, 10) : '';
+        const itemDate = item.time ? String(item.time).substring(0, 10) : '';
         if (itemDate && itemDate < startDate) return false;
       }
       if (endDate) {
-        const itemDate = item.time ? item.time.substring(0, 10) : '';
+        const itemDate = item.time ? String(item.time).substring(0, 10) : '';
         if (itemDate && itemDate > endDate) return false;
       }
 
       if (searchKeyword.trim()) {
         const q = searchKeyword.toLowerCase();
-        const matchName = item.itemName.toLowerCase().includes(q);
-        const matchNote = item.note ? item.note.toLowerCase().includes(q) : false;
-        const matchPayer = item.payer.toLowerCase().includes(q);
-        const matchDebtor = item.debtor.toLowerCase().includes(q);
-        const matchAmount = item.totalAmount.toString().includes(q) || (item.debtorAmount && item.debtorAmount.toString().includes(q));
+        const matchName = item.itemName ? String(item.itemName).toLowerCase().includes(q) : false;
+        const matchNote = item.note ? String(item.note).toLowerCase().includes(q) : false;
+        const matchPayer = item.payer ? String(item.payer).toLowerCase().includes(q) : false;
+        const matchDebtor = item.debtor ? String(item.debtor).toLowerCase().includes(q) : false;
+        const totalStr = (item.totalAmount !== undefined && item.totalAmount !== null) ? String(item.totalAmount) : '';
+        const debtorStr = (item.debtorAmount !== undefined && item.debtorAmount !== null) ? String(item.debtorAmount) : '';
+        const matchAmount = totalStr.includes(q) || debtorStr.includes(q);
         if (!matchName && !matchNote && !matchPayer && !matchDebtor && !matchAmount) return false;
       }
       return true;
     })
     .sort((a, b) => {
-      const amtA = a.debtorAmount || (a.splitMode === 'AA平分' ? Math.round(a.totalAmount / 2) : a.totalAmount);
-      const amtB = b.debtorAmount || (b.splitMode === 'AA平分' ? Math.round(b.totalAmount / 2) : b.totalAmount);
+      const totA = Number(a.totalAmount) || 0;
+      const totB = Number(b.totalAmount) || 0;
+      const amtA = Number(a.debtorAmount) || (a.splitMode === 'AA平分' ? Math.round(totA / 2) : totA);
+      const amtB = Number(b.debtorAmount) || (b.splitMode === 'AA平分' ? Math.round(totB / 2) : totB);
 
       if (sortBy === 'amount-desc') return amtB - amtA;
       if (sortBy === 'amount-asc') return amtA - amtB;
-      if (sortBy === 'time-asc') return new Date(a.time).getTime() - new Date(b.time).getTime();
-      return new Date(b.time).getTime() - new Date(a.time).getTime();
+      
+      const timeA = String(a.time || a.id || '');
+      const timeB = String(b.time || b.id || '');
+      if (sortBy === 'time-asc') return timeA.localeCompare(timeB);
+      return timeB.localeCompare(timeA);
     });
 
-  const unsettledCount = safeItems.filter(i => i.status === '未結清').length;
-  const settledCount = safeItems.filter(i => i.status === '已結清').length;
+  const unsettledCount = safeItems.filter(i => i && i.status === '未結清').length;
+  const settledCount = safeItems.filter(i => i && i.status === '已結清').length;
 
-  const totalFilteredExpenseSum = filteredItems.reduce((acc, item) => acc + (item.totalAmount || 0), 0);
+  const totalFilteredExpenseSum = filteredItems.reduce((acc, item) => acc + (Number(item?.totalAmount) || 0), 0);
   const totalFilteredDebtorSum = filteredItems.reduce((acc, item) => {
-    const amt = item.debtorAmount || (item.splitMode === 'AA平分' ? Math.round(item.totalAmount / 2) : item.totalAmount);
+    const tot = Number(item?.totalAmount) || 0;
+    const amt = Number(item?.debtorAmount) || (item?.splitMode === 'AA平分' ? Math.round(tot / 2) : tot);
     return acc + amt;
   }, 0);
 
   const liaoAdvancedSum = filteredItems
-    .filter(i => i.payer === '廖')
-    .reduce((acc, i) => acc + (i.totalAmount || 0), 0);
+    .filter(i => i?.payer === '廖')
+    .reduce((acc, i) => acc + (Number(i?.totalAmount) || 0), 0);
   const zhouAdvancedSum = filteredItems
-    .filter(i => i.payer === '周')
-    .reduce((acc, i) => acc + (i.totalAmount || 0), 0);
+    .filter(i => i?.payer === '周')
+    .reduce((acc, i) => acc + (Number(i?.totalAmount) || 0), 0);
 
   const handleExportCSV = () => {
     exportSplitRecordsToCSV(filteredItems, `伴伴記_代墊明細_${new Date().toISOString().substring(0, 10)}.csv`);
@@ -107,7 +116,7 @@ export const SplitHistoryTab: React.FC<SplitHistoryTabProps> = ({
               <span>🧾 代墊流水帳明細</span>
             </h2>
             <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-800 text-[10px] font-bold border border-rose-200">
-              共 {items.length} 筆
+              共 {safeItems.length} 筆
             </span>
           </div>
           <p className="text-xs text-[#8C8475] mt-0.5">
@@ -151,7 +160,7 @@ export const SplitHistoryTab: React.FC<SplitHistoryTabProps> = ({
                   : 'text-[#8C8475] hover:text-[#3E3A36]'
               }`}
             >
-              全部 ({items.length})
+              全部 ({safeItems.length})
             </button>
             <button
               type="button"
@@ -278,15 +287,15 @@ export const SplitHistoryTab: React.FC<SplitHistoryTabProps> = ({
           </div>
           <div className="bg-[#FAF8F5] p-2 rounded-xl border border-[#EDE8DC] flex flex-col">
             <span className="text-[10px] text-[#8C8475]">消費總金額</span>
-            <span className="font-mono font-bold text-[#3E3A36]">NT$ {totalFilteredExpenseSum.toLocaleString()}</span>
+            <span className="font-mono font-bold text-[#3E3A36]">NT$ {(Number(totalFilteredExpenseSum) || 0).toLocaleString()}</span>
           </div>
           <div className="bg-sky-50/70 p-2 rounded-xl border border-sky-200/60 flex flex-col">
             <span className="text-[10px] text-sky-800 font-semibold">廖先付小計</span>
-            <span className="font-mono font-bold text-sky-900">NT$ {liaoAdvancedSum.toLocaleString()}</span>
+            <span className="font-mono font-bold text-sky-900">NT$ {(Number(liaoAdvancedSum) || 0).toLocaleString()}</span>
           </div>
           <div className="bg-rose-50/70 p-2 rounded-xl border border-rose-200/60 flex flex-col">
             <span className="text-[10px] text-rose-800 font-semibold">周先付小計</span>
-            <span className="font-mono font-bold text-rose-900">NT$ {zhouAdvancedSum.toLocaleString()}</span>
+            <span className="font-mono font-bold text-rose-900">NT$ {(Number(zhouAdvancedSum) || 0).toLocaleString()}</span>
           </div>
         </div>
 
@@ -330,7 +339,10 @@ export const SplitHistoryTab: React.FC<SplitHistoryTabProps> = ({
         <div className="space-y-3">
           {filteredItems.map((item) => {
             const isUnsettled = item.status === '未結清';
-            const debtorAmt = item.debtorAmount || (item.splitMode === 'AA平分' ? Math.round(item.totalAmount / 2) : item.totalAmount);
+            const totalAmt = Number(item.totalAmount) || 0;
+            const debtorAmt = Number(item.debtorAmount) || (item.splitMode === 'AA平分' ? Math.round(totalAmt / 2) : totalAmt);
+            const payerLabel = item.payer === '廖' ? '廖' : '周';
+            const debtorLabel = item.debtor || (item.payer === '廖' ? '周' : '廖');
 
             return (
               <div
@@ -346,16 +358,16 @@ export const SplitHistoryTab: React.FC<SplitHistoryTabProps> = ({
                   <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-sm shrink-0 mt-0.5 ${
                     item.payer === '廖' ? 'bg-sky-100 text-sky-800' : 'bg-rose-100 text-rose-800'
                   }`}>
-                    {item.payer === '廖' ? '廖' : '周'}
+                    {payerLabel}
                   </div>
 
                   <div className="space-y-1 min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h4 className="text-sm sm:text-base font-bold text-[#3E3A36] break-words">
-                        {item.itemName}
+                        {item.itemName || '未命名款項'}
                       </h4>
                       <span className="px-2 py-0.5 rounded-md bg-[#F4F1EA] text-[#6E6659] text-[10px] font-bold">
-                        {item.splitMode}
+                        {item.splitMode || 'AA平分'}
                       </span>
                       {isUnsettled ? (
                         <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[10px] font-bold border border-rose-200">
@@ -369,10 +381,10 @@ export const SplitHistoryTab: React.FC<SplitHistoryTabProps> = ({
                     </div>
 
                     <div className="text-xs text-[#7A7366] flex items-center gap-2 flex-wrap">
-                      <span>消費總額：${item.totalAmount.toLocaleString()}</span>
+                      <span>消費總額：${(Number(totalAmt) || 0).toLocaleString()}</span>
                       <span>•</span>
                       <span className="font-bold text-rose-700">
-                        {item.debtor} 應返還 NT$ {debtorAmt.toLocaleString()}
+                        {debtorLabel} 應返還 NT$ {(Number(debtorAmt) || 0).toLocaleString()}
                       </span>
                     </div>
 
@@ -383,7 +395,7 @@ export const SplitHistoryTab: React.FC<SplitHistoryTabProps> = ({
                     )}
 
                     <div className="text-[10px] text-[#A09A8F] pt-0.5 flex items-center gap-2">
-                      <span>🕒 記帳時間：{item.time}</span>
+                      <span>🕒 記帳時間：{item.time || '—'}</span>
                       {item.settledTime && (
                         <span>• ✅ 結清時間：{item.settledTime}</span>
                       )}
@@ -396,7 +408,7 @@ export const SplitHistoryTab: React.FC<SplitHistoryTabProps> = ({
                   <div className="text-left sm:text-right">
                     <div className="text-xs text-[#8C8475]">應還款額</div>
                     <div className="text-base sm:text-lg font-black text-rose-600">
-                      ${debtorAmt.toLocaleString()}
+                      ${(Number(debtorAmt) || 0).toLocaleString()}
                     </div>
                   </div>
 

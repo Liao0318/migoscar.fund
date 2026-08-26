@@ -45,24 +45,6 @@ export const Header: React.FC<HeaderProps> = ({
               <h1 className="text-lg sm:text-xl font-bold tracking-tight text-[#3E3A36] flex items-center gap-1">
                 伴伴記<span className="text-rose-500 text-base sm:text-lg">❤️</span>
               </h1>
-              {!isOnline && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-[10px] font-semibold text-amber-800" title="目前處於離線模式">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                  <span>離線</span>
-                </span>
-              )}
-
-              {pendingQueueCount > 0 && (
-                <button
-                  type="button"
-                  onClick={onFlushQueue || onOpenDataBackup}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100/90 border border-amber-300 text-[10px] font-bold text-amber-900 animate-pulse hover:bg-amber-200 transition-colors cursor-pointer"
-                  title="點擊立即手動重送所有離線待傳項目"
-                >
-                  <RefreshCw className="w-2.5 h-2.5" />
-                  <span>{pendingQueueCount} 筆待同步</span>
-                </button>
-              )}
             </div>
             <p className="text-[11px] sm:text-xs text-[#8C8475] font-light mt-0.5 truncate">公積金與代墊記帳</p>
           </div>

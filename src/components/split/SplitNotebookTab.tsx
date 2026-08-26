@@ -339,9 +339,9 @@ export const SplitNotebookTab: React.FC<SplitNotebookTabProps> = ({
                   </h4>
 
                   <div className="text-xs text-[#7A7366] flex items-center gap-3 flex-wrap">
-                    {item.estimatedPrice && (
+                    {item.estimatedPrice !== undefined && item.estimatedPrice !== null && (
                       <span className="font-semibold text-rose-700">
-                        預估 NT$ {item.estimatedPrice.toLocaleString()}
+                        預估 NT$ {(Number(item.estimatedPrice) || 0).toLocaleString()}
                       </span>
                     )}
                     {item.deadline && (

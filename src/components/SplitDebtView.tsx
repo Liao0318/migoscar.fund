@@ -120,11 +120,11 @@ export const SplitDebtView: React.FC<SplitDebtViewProps> = ({
     if (liaoOwesZhou > zhouOwesLiao) {
       netDebtor = '廖';
       netAmount = liaoOwesZhou - zhouOwesLiao;
-      summaryText = `廖 應返還 周 NT$ ${netAmount.toLocaleString()}`;
+      summaryText = `廖 應返還 周 NT$ ${(Number(netAmount) || 0).toLocaleString()}`;
     } else if (zhouOwesLiao > liaoOwesZhou) {
       netDebtor = '周';
       netAmount = zhouOwesLiao - liaoOwesZhou;
-      summaryText = `周 應返還 廖 NT$ ${netAmount.toLocaleString()}`;
+      summaryText = `周 應返還 廖 NT$ ${(Number(netAmount) || 0).toLocaleString()}`;
     }
 
     const newSummary: SplitSummary = {
@@ -224,7 +224,7 @@ export const SplitDebtView: React.FC<SplitDebtViewProps> = ({
       splitMode,
       itemName: itemName.trim(),
       totalAmount: num,
-      splitResult: `${otherPerson} 應返還 ${payer} NT$ ${debtorAmt.toLocaleString()}`,
+      splitResult: `${otherPerson} 應返還 ${payer} NT$ ${(Number(debtorAmt) || 0).toLocaleString()}`,
       debtor: otherPerson,
       debtorAmount: debtorAmt,
       status: '未結清',
@@ -446,14 +446,14 @@ export const SplitDebtView: React.FC<SplitDebtViewProps> = ({
                   </div>
                   <div className="text-3xl font-black tracking-tight text-[#D34E36] flex items-baseline gap-1 pt-0.5">
                     <span className="text-base font-bold text-[#8C7E74]">NT$</span>
-                    {summary.netAmount.toLocaleString()}
+                    {(Number(summary?.netAmount) || 0).toLocaleString()}
                   </div>
                 </div>
               )}
             </div>
 
             {/* 一鍵結清按鈕 */}
-            {summary.unsettledCount > 0 && (
+            {(summary?.unsettledCount || 0) > 0 && (
               <button
                 id="btn-settle-all-split"
                 onClick={() => setShowSettleModal(true)}
@@ -472,14 +472,14 @@ export const SplitDebtView: React.FC<SplitDebtViewProps> = ({
                 <span className="w-2 h-2 rounded-full bg-[#2B825B]" />
                 <span className="text-[#6E6359]">周 應返還 廖</span>
               </div>
-              <span className="font-bold text-[#3D3733]">NT$ {summary.zhouOwesLiao.toLocaleString()}</span>
+              <span className="font-bold text-[#3D3733]">NT$ {(Number(summary?.zhouOwesLiao) || 0).toLocaleString()}</span>
             </div>
             <div className="p-2.5 rounded-xl bg-white/70 border border-black/5 flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-[#D34E36]" />
                 <span className="text-[#6E6359]">廖 應返還 周</span>
               </div>
-              <span className="font-bold text-[#3D3733]">NT$ {summary.liaoOwesZhou.toLocaleString()}</span>
+              <span className="font-bold text-[#3D3733]">NT$ {(Number(summary?.liaoOwesZhou) || 0).toLocaleString()}</span>
             </div>
           </div>
         </motion.div>
@@ -670,7 +670,7 @@ export const SplitDebtView: React.FC<SplitDebtViewProps> = ({
                       </span>
                     </div>
                     <span className="font-bold text-sm text-[#2E6B47]">
-                      NT$ {previewDebtorOwe.toLocaleString()}
+                      NT$ {(Number(previewDebtorOwe) || 0).toLocaleString()}
                     </span>
                   </div>
                 )}
@@ -811,10 +811,10 @@ export const SplitDebtView: React.FC<SplitDebtViewProps> = ({
 
                   <div className="text-right space-y-1 shrink-0">
                     <div className="text-xs text-[#8C7E74]">
-                      總額 NT$ {item.totalAmount.toLocaleString()}
+                      總額 NT$ {(Number(item.totalAmount) || 0).toLocaleString()}
                     </div>
                     <div className="text-sm font-black text-[#D34E36]">
-                      {item.debtor} 需返還 ${item.debtorAmount.toLocaleString()}
+                      {item.debtor || '對方'} 需返還 ${(Number(item.debtorAmount) || 0).toLocaleString()}
                     </div>
                     <button
                       onClick={() => confirmDeleteItem(item)}
@@ -857,11 +857,11 @@ export const SplitDebtView: React.FC<SplitDebtViewProps> = ({
               <div className="p-3.5 rounded-xl bg-rose-50/50 border border-rose-100 text-xs text-[#6E6359] space-y-1">
                 <div>
                   <strong>品項名稱：</strong>
-                  <span className="font-bold text-[#3D3733] ml-1">{deleteConfirmItem.itemName}</span>
+                  <span className="font-bold text-[#3D3733] ml-1">{deleteConfirmItem.itemName || '代墊款項'}</span>
                 </div>
                 <div>
                   <strong>消費金額：</strong>
-                  <span className="font-bold text-rose-700 ml-1">NT$ {deleteConfirmItem.totalAmount.toLocaleString()}</span>
+                  <span className="font-bold text-rose-700 ml-1">NT$ {(Number(deleteConfirmItem.totalAmount) || 0).toLocaleString()}</span>
                 </div>
                 <p className="text-[11px] text-[#8C7E74] pt-1">
                   刪除後將會重新計算雙方的結算帳款，此動作無法還原。

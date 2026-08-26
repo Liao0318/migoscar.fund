@@ -343,7 +343,7 @@ export const SplitAddModal: React.FC<SplitAddModalProps> = ({
 
                   <div className="text-right">
                     <div className="text-lg font-black text-rose-600">
-                      NT$ {previewOwe.toLocaleString()}
+                      NT$ {(Number(previewOwe) || 0).toLocaleString()}
                     </div>
                     <div className="text-[10px] text-[#8C8475]">
                       {splitMode}

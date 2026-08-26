@@ -286,7 +286,39 @@ const isMonthReconciled = (month: string, list: string[]): boolean => {
 };
 
 export default function App() {
-  const [records, setRecords] = useState<RecordItem[]>([]);
+  const [records, setRecords] = useState<RecordItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('muji_ledger_data');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((r: any) => {
+            let mStr = String(r.month || '').trim();
+            if (!/^\d{4}-\d{2}$/.test(mStr)) {
+              if (/^\d{4}-\d{2}-\d{2}$/.test(mStr)) {
+                mStr = mStr.substring(0, 7);
+              } else {
+                const d = new Date(mStr);
+                if (!isNaN(d.getTime())) {
+                  const year = d.getFullYear();
+                  const month = String(d.getMonth() + 1).padStart(2, '0');
+                  mStr = `${year}-${month}`;
+                }
+              }
+            }
+            return {
+              ...r,
+              month: mStr,
+              date: r.date || `${mStr}-01`
+            };
+          });
+        }
+      }
+      return INITIAL_RECORDS;
+    } catch (e) {
+      return INITIAL_RECORDS;
+    }
+  });
   // 模式狀態：'fund' (公積金模式) ｜ 'split' (代墊借還模式)
   const [appMode, setAppMode] = useState<'fund' | 'split'>(() => {
     try {
@@ -383,11 +415,11 @@ export default function App() {
     if (liaoOwesZhou > zhouOwesLiao) {
       netDebtor = '廖';
       netAmount = liaoOwesZhou - zhouOwesLiao;
-      summaryText = `廖廖 應返還 周周 NT$ ${netAmount.toLocaleString()}`;
+      summaryText = `廖廖 應返還 周周 NT$ ${(Number(netAmount) || 0).toLocaleString()}`;
     } else if (zhouOwesLiao > liaoOwesZhou) {
       netDebtor = '周';
       netAmount = zhouOwesLiao - liaoOwesZhou;
-      summaryText = `周周 應返還 廖廖 NT$ ${netAmount.toLocaleString()}`;
+      summaryText = `周周 應返還 廖廖 NT$ ${(Number(netAmount) || 0).toLocaleString()}`;
     }
 
     const newSummary: SplitSummary = {
@@ -597,9 +629,10 @@ export default function App() {
       await Promise.all([
         fetchDashboardData(false, false),
         fetchShoppingData(false),
-        fetchSplitData(false)
+        fetchSplitData(false),
+        fetchTravelData(true)
       ]);
-      showToast('🎉 所有資料庫已與 Google 試算表完成即時對帳！', 'success');
+      showToast('🎉 所有資料庫（流水帳、採購、代墊、旅遊分帳）已與 Google 試算表完成即時對帳！', 'success');
     } finally {
       setIsSyncingGas(false);
     }
@@ -717,6 +750,27 @@ export default function App() {
     }
   };
 
+  const fetchTravelData = async (silent = false) => {
+    try {
+      const res = await callGasApi('getTravelData');
+      if (res && res.success) {
+        if (Array.isArray(res.trips)) {
+          localStorage.setItem('banban_travel_trips', JSON.stringify(res.trips));
+        }
+        if (Array.isArray(res.expenses)) {
+          localStorage.setItem('banban_travel_expenses', JSON.stringify(res.expenses));
+        }
+        if (Array.isArray(res.wishlist)) {
+          localStorage.setItem('banban_travel_wishlist', JSON.stringify(res.wishlist));
+        }
+        window.dispatchEvent(new CustomEvent('travel-data-updated', { detail: res }));
+        if (!silent) showToast('旅遊分帳資料已同步更新！', 'success');
+      }
+    } catch (err) {
+      console.warn('fetchTravelData error:', err);
+    }
+  };
+
   const handleAddSplitRecord = async (data: {
     payer: '廖' | '周';
     itemName: string;
@@ -743,7 +797,7 @@ export default function App() {
       splitMode: data.splitMode,
       itemName: data.itemName,
       totalAmount: data.totalAmount,
-      splitResult: `${otherPerson} 應返還 ${data.payer} NT$ ${debtorAmt.toLocaleString()}`,
+      splitResult: `${otherPerson} 應返還 ${data.payer} NT$ ${(Number(debtorAmt) || 0).toLocaleString()}`,
       debtor: otherPerson,
       debtorAmount: debtorAmt,
       status: '未結清',
@@ -801,8 +855,8 @@ export default function App() {
 
   const handleDeleteSplitRecord = (id: string) => {
     const target = splitItems.find(i => String(i.id) === String(id));
-    const itemName = target ? `「${target.itemName}」` : '這筆代墊明細';
-    const amountStr = target ? `（NT$ ${target.totalAmount.toLocaleString()}）` : '';
+    const itemName = target ? `「${target.itemName || '代墊明細'}」` : '這筆代墊明細';
+    const amountStr = target && target.totalAmount !== undefined && target.totalAmount !== null ? `（NT$ ${(Number(target.totalAmount) || 0).toLocaleString()}）` : '';
 
     setCustomConfirmState({
       isOpen: true,
@@ -885,6 +939,8 @@ export default function App() {
     showToast('連線設定與 Web App API URL 已儲存！正嘗試即時連線...', 'success');
     fetchDashboardData(true);
     fetchShoppingData();
+    fetchSplitData(true);
+    fetchTravelData(true);
   };
 
   const getCustomizedCodeGs = () => {
@@ -1002,6 +1058,7 @@ export default function App() {
     fetchDashboardData(false, false);
     fetchShoppingData(false);
     fetchSplitData(true);
+    fetchTravelData(true);
 
     // 監聽連線與斷線事件
     const handleOnline = async () => {
@@ -1014,6 +1071,7 @@ export default function App() {
       fetchDashboardData(false, true);
       fetchShoppingData(true);
       fetchSplitData(true);
+      fetchTravelData(true);
     };
     const handleOffline = () => {
       setIsOnline(false);
@@ -1041,6 +1099,7 @@ export default function App() {
         fetchDashboardData(false, true);
         fetchShoppingData(true);
         fetchSplitData(true);
+        fetchTravelData(true);
       }
     }, 10000);
 
@@ -1056,6 +1115,7 @@ export default function App() {
           fetchDashboardData(false, true);
           fetchShoppingData(true);
           fetchSplitData(true);
+          fetchTravelData(true);
         }
       }
     };
@@ -1606,12 +1666,12 @@ export default function App() {
         const titleTag = isIncome ? "💰 " : "💸 ";
         const actionName = isIncome ? "撥入了公積金" : "新增了日常代墊";
         const notifyTitle = `${titleTag}${rec.payer} ${actionName}`;
-        const notifyDesc = `「${rec.item}」：金額 $${rec.amount.toLocaleString()} 元 (${rec.month} 月份)`;
+        const notifyDesc = `「${rec.item}」：金額 $${(Number(rec.amount) || 0).toLocaleString()} 元 (${rec.month} 月份)`;
         
         const exists = updated.some(n => 
           n.id === notifId || 
           n.desc === notifyDesc || 
-          (n.desc.includes(rec.item) && n.desc.includes(rec.amount.toLocaleString()))
+          (n.desc.includes(rec.item) && n.desc.includes((Number(rec.amount) || 0).toLocaleString()))
         );
         
         if (!exists) {
@@ -1619,7 +1679,7 @@ export default function App() {
           const titleTag = isIncome ? "💰 " : "💸 ";
           const actionName = isIncome ? "撥入了公積金" : "新增了日常代墊";
           const notifyTitle = `${titleTag}${rec.payer} ${actionName}`;
-          const notifyDesc = `「${rec.item}」：金額 $${rec.amount.toLocaleString()} 元 (${rec.month} 月份)`;
+          const notifyDesc = `「${rec.item}」：金額 $${(Number(rec.amount) || 0).toLocaleString()} 元 (${rec.month} 月份)`;
           
           let recordTimestamp = Date.now();
           let timeDisplayStr = formatAmPmTime(rec.timestamp || rec.date || '');
@@ -2003,12 +2063,12 @@ export default function App() {
       const isExpense = formData.type.startsWith('支出');
       const currObj = CURRENCIES.find(c => c.code === selectedCurrency);
       const foreignStr = selectedCurrency !== 'TWD'
-        ? ` (原幣 ${currObj?.flag || ''} ${numAmount.toLocaleString('zh-TW')} ${selectedCurrency}, 匯率 ${effectiveRate})`
+        ? ` (原幣 ${currObj?.flag || ''} ${(Number(numAmount) || 0).toLocaleString('zh-TW')} ${selectedCurrency}, 匯率 ${effectiveRate})`
         : '';
       const notifTitle = isExpense 
         ? `💸 ${formData.payer} 新增了日常代墊${selectedCurrency !== 'TWD' ? ' (外幣)' : ''}`
         : `💰 ${formData.payer} 撥入了公積金`;
-      const notifDesc = `「${formData.item.trim()}」：金額 $${twdAmount.toLocaleString('zh-TW')} 元${foreignStr} (${monthStr} 月份)`;
+      const notifDesc = `「${formData.item.trim()}」：金額 $${(Number(twdAmount) || 0).toLocaleString('zh-TW')} 元${foreignStr} (${monthStr} 月份)`;
       addNotificationAndSave(notifTitle, notifDesc, isExpense ? 'expense' : 'income');
 
       setIsAddOpen(false);
@@ -2244,7 +2304,7 @@ export default function App() {
         alerts.push({
           id: `deficit-${m}`,
           title: `⚠️ ${m} 月份入不敷出提示`,
-          message: `${m} 月份代墊支出為 $${stat.expenses.toLocaleString()} 元，目前剩餘的總公積金為 $${remainingPool.toLocaleString()} 元，可用額度不足，超支達 $${deficit.toLocaleString()} 元。請注意花錢狀況！`,
+          message: `${m} 月份代墊支出為 $${(Number(stat.expenses) || 0).toLocaleString()} 元，目前剩餘的總公積金為 $${(Number(remainingPool) || 0).toLocaleString()} 元，可用額度不足，超支達 $${(Number(deficit) || 0).toLocaleString()} 元。請注意花錢狀況！`,
           type: 'error'
         });
       }
@@ -2266,7 +2326,7 @@ export default function App() {
         alerts.push({
           id: `consecutive-clear-${curM}`,
           title: `💡 跨月結算與省錢通知`,
-          message: `本月 (${curM}) 已有撥入公積金。然而上個月 (${prevM}) 代墊支出超過剩餘的總公積金（超支赤字 $${deficit.toLocaleString()} 元），請本月撥款時優先補繳、結清上月款項，並切記注意花錢與非必要性日常消費！`,
+          message: `本月 (${curM}) 已有撥入公積金。然而上個月 (${prevM}) 代墊支出超過剩餘的總公積金（超支赤字 $${(Number(deficit) || 0).toLocaleString()} 元），請本月撥款時優先補繳、結清上月款項，並切記注意花錢與非必要性日常消費！`,
           type: 'warning'
         });
       }
@@ -2548,18 +2608,18 @@ export default function App() {
                           <span className="text-xs text-[#7A756E] font-medium">預計銷帳後剩餘額度</span>
                           <div className={`text-2xl sm:text-3xl lg:text-4xl font-light font-mono leading-none tracking-tight break-words ${quota >= 0 ? 'text-emerald-700' : 'text-[#C55757]'}`}>
                             {quota < 0 ? '- $ ' : '$ '}
-                            <span className="font-bold">{Math.abs(quota).toLocaleString('zh-TW')}</span> 元
+                            <span className="font-bold">{(Number(Math.abs(quota)) || 0).toLocaleString('zh-TW')}</span> 元
                             {quota < 0 && <span className="text-xs font-bold text-[#C55757] ml-2">(超支)</span>}
                           </div>
                         </div>
 
                         {/* 算式拆解標籤 */}
                         <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-mono bg-white/90 backdrop-blur-xs px-2.5 py-1.5 sm:px-3 rounded-xl border border-[#EBE8DE] text-[#5C564E] flex-wrap max-w-full">
-                          <span>池內餘額 <strong className="text-emerald-700">${currentPool.toLocaleString('zh-TW')}</strong></span>
+                          <span>池內餘額 <strong className="text-emerald-700">${(Number(currentPool) || 0).toLocaleString('zh-TW')}</strong></span>
                           <span className="text-gray-400">-</span>
-                          <span>待銷帳代墊 <strong className="text-amber-700">${pending.toLocaleString('zh-TW')}</strong></span>
+                          <span>待銷帳代墊 <strong className="text-amber-700">${(Number(pending) || 0).toLocaleString('zh-TW')}</strong></span>
                           <span className="text-gray-400">=</span>
-                          <span>預計剩餘 <strong className={quota >= 0 ? 'text-emerald-700' : 'text-[#C55757]'}>{quota < 0 ? '-' : ''}${Math.abs(quota).toLocaleString('zh-TW')}</strong></span>
+                          <span>預計剩餘 <strong className={quota >= 0 ? 'text-emerald-700' : 'text-[#C55757]'}>{quota < 0 ? '-' : ''}${(Number(Math.abs(quota)) || 0).toLocaleString('zh-TW')}</strong></span>
                         </div>
                       </div>
 
@@ -2580,7 +2640,7 @@ export default function App() {
                       <h3 className="text-xs font-semibold text-[#5C564E]">公積金撥入額度</h3>
                     </div>
                     <div className="text-base font-light text-[#3E3A36] font-mono leading-none mt-2 break-words">
-                      $ <span className="text-lg sm:text-xl font-bold">{homeStats.income.toLocaleString('zh-TW')}</span> 元
+                      $ <span className="text-lg sm:text-xl font-bold">{(Number(homeStats?.income) || 0).toLocaleString('zh-TW')}</span> 元
                     </div>
                   </div>
 
@@ -2590,7 +2650,7 @@ export default function App() {
                       <h3 className="text-xs font-semibold text-[#5C564E]">雙方代墊總支出</h3>
                     </div>
                     <div className="text-base font-light text-[#3E3A36] font-mono leading-none mt-2 break-words">
-                      $ <span className="text-lg sm:text-xl font-bold">{homeStats.expenses.toLocaleString('zh-TW')}</span> 元
+                      $ <span className="text-lg sm:text-xl font-bold">{(Number(homeStats?.expenses) || 0).toLocaleString('zh-TW')}</span> 元
                     </div>
                   </div>
 
@@ -2602,7 +2662,7 @@ export default function App() {
                       </h3>
                     </div>
                     <div className={`text-base font-light font-mono leading-none mt-2 break-words ${overallStats.diff >= 0 ? 'text-emerald-700' : 'text-[#C55757]'}`}>
-                      $ <span className="text-lg sm:text-xl font-bold">{Math.abs(overallStats.diff).toLocaleString('zh-TW')}</span> 元
+                      $ <span className="text-lg sm:text-xl font-bold">{(Number(Math.abs(overallStats?.diff || 0)) || 0).toLocaleString('zh-TW')}</span> 元
                     </div>
                   </div>
                 </div>
@@ -2726,11 +2786,11 @@ export default function App() {
                             </div>
                             <div className="text-right shrink-0">
                               <span className="font-mono font-bold text-xs sm:text-sm text-[#3E3A36] whitespace-nowrap bg-[#FAF9F5] px-2 py-1 rounded border border-[#E8E4D9] block">
-                                $ {r.amount.toLocaleString('zh-TW')}
+                                $ {(Number(r?.amount) || 0).toLocaleString('zh-TW')}
                               </span>
                               {r.currency && r.currency !== 'TWD' && (
                                 <span className="text-[9px] text-amber-900 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/80 font-mono block mt-0.5">
-                                  {CURRENCIES.find(c => c.code === r.currency)?.flag} {r.originalAmount?.toLocaleString('zh-TW')} {r.currency}
+                                  {CURRENCIES.find(c => c.code === r.currency)?.flag} {(Number(r?.originalAmount) || 0).toLocaleString('zh-TW')} {r.currency}
                                 </span>
                               )}
                             </div>
@@ -3000,15 +3060,15 @@ export default function App() {
                         </div>
                         <div className="bg-rose-50/60 p-2.5 rounded-xl border border-rose-200/60 flex flex-col">
                           <span className="text-[10px] text-rose-800 font-semibold">支出小計</span>
-                          <span className="font-mono font-bold text-rose-900">NT$ {expSum.toLocaleString()}</span>
+                          <span className="font-mono font-bold text-rose-900">NT$ {(Number(expSum) || 0).toLocaleString()}</span>
                         </div>
                         <div className="bg-sky-50/60 p-2.5 rounded-xl border border-sky-200/60 flex flex-col">
                           <span className="text-[10px] text-sky-800 font-semibold">廖代墊小計</span>
-                          <span className="font-mono font-bold text-sky-900">NT$ {liaoAdv.toLocaleString()}</span>
+                          <span className="font-mono font-bold text-sky-900">NT$ {(Number(liaoAdv) || 0).toLocaleString()}</span>
                         </div>
                         <div className="bg-amber-50/60 p-2.5 rounded-xl border border-amber-200/60 flex flex-col">
                           <span className="text-[10px] text-amber-800 font-semibold">周代墊小計</span>
-                          <span className="font-mono font-bold text-amber-900">NT$ {zhouAdv.toLocaleString()}</span>
+                          <span className="font-mono font-bold text-amber-900">NT$ {(Number(zhouAdv) || 0).toLocaleString()}</span>
                         </div>
                       </div>
 
@@ -3124,11 +3184,11 @@ export default function App() {
                             <div className="text-left sm:text-right">
                               <span className="text-[10px] text-[#A59F94] block font-light">金額 (台幣 NT$)</span>
                               <span className="font-mono font-bold text-[#3E3A36] text-sm sm:text-base block">
-                                $ {r.amount.toLocaleString('zh-TW')}
+                                $ {(Number(r?.amount) || 0).toLocaleString('zh-TW')}
                               </span>
                               {r.currency && r.currency !== 'TWD' && (
                                 <span className="text-[10px] text-amber-900 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/80 font-mono block mt-0.5">
-                                  {CURRENCIES.find(c => c.code === r.currency)?.flag} {r.originalAmount?.toLocaleString('zh-TW')} {r.currency} (匯率 {r.exchangeRate})
+                                  {CURRENCIES.find(c => c.code === r.currency)?.flag} {(Number(r?.originalAmount) || 0).toLocaleString('zh-TW')} {r.currency} (匯率 {r.exchangeRate})
                                 </span>
                               )}
                             </div>
@@ -3258,7 +3318,7 @@ export default function App() {
                           </div>
                           <div className="mt-2">
                             <div className="text-lg sm:text-xl font-light text-[#3E3A36] font-mono leading-none break-words">
-                              $ <span className="text-xl sm:text-2xl font-bold">{compLiaoMonthTotal.toLocaleString('zh-TW')}</span> 元
+                              $ <span className="text-xl sm:text-2xl font-bold">{(Number(compLiaoMonthTotal) || 0).toLocaleString('zh-TW')}</span> 元
                             </div>
                           </div>
                         </div>
@@ -3274,7 +3334,7 @@ export default function App() {
                           </div>
                           <div className="mt-2">
                             <div className="text-lg sm:text-xl font-light text-[#3E3A36] font-mono leading-none break-words">
-                              $ <span className="text-xl sm:text-2xl font-bold">{compZhouMonthTotal.toLocaleString('zh-TW')}</span> 元
+                              $ <span className="text-xl sm:text-2xl font-bold">{(Number(compZhouMonthTotal) || 0).toLocaleString('zh-TW')}</span> 元
                             </div>
                           </div>
                         </div>
@@ -3301,7 +3361,7 @@ export default function App() {
                                   <div className="flex items-center gap-1.5 flex-wrap">
                                     <span className="w-1.5 h-1.5 rounded-full bg-[#8C8475] shrink-0" />
                                     <span>公積金應撥款給 <strong>廖尹丞</strong>：</span>
-                                    <span className="font-mono font-bold text-sm text-[#8C5E24] underline decoration-wavy">$ {compLiaoMonthTotal.toLocaleString('zh-TW')}</span>
+                                    <span className="font-mono font-bold text-sm text-[#8C5E24] underline decoration-wavy">$ {(Number(compLiaoMonthTotal) || 0).toLocaleString('zh-TW')}</span>
                                     <span>元</span>
                                   </div>
                                 )}
@@ -3309,7 +3369,7 @@ export default function App() {
                                   <div className="flex items-center gap-1.5 flex-wrap">
                                     <span className="w-1.5 h-1.5 rounded-full bg-[#8C8475] shrink-0" />
                                     <span>公積金應撥款給 <strong>周沛緹</strong>：</span>
-                                    <span className="font-mono font-bold text-sm text-[#8C5E24] underline decoration-wavy">$ {compZhouMonthTotal.toLocaleString('zh-TW')}</span>
+                                    <span className="font-mono font-bold text-sm text-[#8C5E24] underline decoration-wavy">$ {(Number(compZhouMonthTotal) || 0).toLocaleString('zh-TW')}</span>
                                     <span>元</span>
                                   </div>
                                 )}
@@ -3350,7 +3410,7 @@ export default function App() {
                                 <div className="font-mono text-[9px] text-[#9A948C] whitespace-nowrap">📅 {r.date || `${r.month}-01`}</div>
                               </div>
                               <div className="flex items-center gap-2 shrink-0">
-                                <span className="font-mono font-bold text-[#4D4942] whitespace-nowrap">$ {r.amount.toLocaleString('zh-TW')}</span>
+                                <span className="font-mono font-bold text-[#4D4942] whitespace-nowrap">$ {(Number(r?.amount) || 0).toLocaleString('zh-TW')}</span>
                                 <button 
                                   onClick={() => handleDelete(r.id)}
                                   className="text-[#A59F94] hover:text-[#C55757] p-1.5 rounded-lg hover:bg-red-50 hover:border-red-100 transition-all border border-transparent cursor-pointer"
@@ -3384,7 +3444,7 @@ export default function App() {
                                 <div className="font-mono text-[9px] text-[#9A948C] whitespace-nowrap">📅 {r.date || `${r.month}-01`}</div>
                               </div>
                               <div className="flex items-center gap-2 shrink-0">
-                                <span className="font-mono font-bold text-[#4D4942] whitespace-nowrap">$ {r.amount.toLocaleString('zh-TW')}</span>
+                                <span className="font-mono font-bold text-[#4D4942] whitespace-nowrap">$ {(Number(r?.amount) || 0).toLocaleString('zh-TW')}</span>
                                 <button 
                                   onClick={() => handleDelete(r.id)}
                                   className="text-[#A59F94] hover:text-[#C55757] p-1.5 rounded-lg hover:bg-red-50 hover:border-red-100 transition-all border border-transparent cursor-pointer"
@@ -3783,24 +3843,24 @@ export default function App() {
                 <div className="text-[10px] sm:text-xs text-[#E8DFC8] font-bold tracking-wider flex items-center gap-1.5 shrink-0 whitespace-nowrap">
                   <ArrowRightLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-400 shrink-0" />
                   <span>
-                    {splitSummary.unsettledCount > 0
+                    {(splitSummary?.unsettledCount || 0) > 0
                       ? `未結代墊 (${splitSummary.unsettledCount}筆)：`
                       : '代墊狀態：'}
                   </span>
                 </div>
 
                 <div className="flex gap-2 sm:gap-3 items-center shrink-0">
-                  {splitSummary.unsettledCount === 0 ? (
+                  {(splitSummary?.unsettledCount || 0) === 0 ? (
                     <span className="text-emerald-400 text-[11px] sm:text-xs font-bold whitespace-nowrap">
                       ✨ 目前已全部結清
                     </span>
                   ) : (
                     <>
                       <div className="text-[10px] sm:text-xs text-white/90 whitespace-nowrap hidden sm:block">
-                        廖代墊: <span className="font-mono font-bold text-rose-300">$ {splitSummary.zhouOwesLiao.toLocaleString()}</span>
+                        廖代墊: <span className="font-mono font-bold text-rose-300">$ {(Number(splitSummary?.zhouOwesLiao) || 0).toLocaleString()}</span>
                       </div>
                       <div className="text-[10px] sm:text-xs text-white/90 whitespace-nowrap hidden sm:block">
-                        周代墊: <span className="font-mono font-bold text-rose-300">$ {splitSummary.liaoOwesZhou.toLocaleString()}</span>
+                        周代墊: <span className="font-mono font-bold text-rose-300">$ {(Number(splitSummary?.liaoOwesZhou) || 0).toLocaleString()}</span>
                       </div>
 
                       {/* 淨結算方向按鈕，點擊可直接開啟對帳彈窗 */}
@@ -3810,15 +3870,15 @@ export default function App() {
                         className="cursor-pointer transition-all active:scale-95"
                         title="點擊開啟結算對帳"
                       >
-                        {splitSummary.netDebtor === '周' ? (
+                        {splitSummary?.netDebtor === '周' ? (
                           <span className="bg-rose-500/25 hover:bg-rose-500/40 text-rose-200 border border-rose-500/40 px-2 py-0.5 rounded-lg text-[10px] sm:text-xs font-bold whitespace-nowrap flex items-center gap-1">
                             <span>周應還廖</span>
-                            <span className="font-mono text-white">$ {splitSummary.netAmount.toLocaleString()}</span>
+                            <span className="font-mono text-white">$ {(Number(splitSummary?.netAmount) || 0).toLocaleString()}</span>
                           </span>
-                        ) : splitSummary.netDebtor === '廖' ? (
+                        ) : splitSummary?.netDebtor === '廖' ? (
                           <span className="bg-amber-500/25 hover:bg-amber-500/40 text-amber-200 border border-amber-500/40 px-2 py-0.5 rounded-lg text-[10px] sm:text-xs font-bold whitespace-nowrap flex items-center gap-1">
                             <span>廖應還周</span>
-                            <span className="font-mono text-white">$ {splitSummary.netAmount.toLocaleString()}</span>
+                            <span className="font-mono text-white">$ {(Number(splitSummary?.netAmount) || 0).toLocaleString()}</span>
                           </span>
                         ) : (
                           <span className="bg-emerald-500/25 text-emerald-200 border border-emerald-500/40 px-2 py-0.5 rounded-lg text-[10px] sm:text-xs font-bold whitespace-nowrap">
@@ -3851,10 +3911,10 @@ export default function App() {
                 </div>
                 <div className="flex gap-2 sm:gap-3.5 items-center shrink-0">
                   <div className="text-[11px] sm:text-xs text-white whitespace-nowrap">
-                    L: <span className="font-mono font-bold text-[#EFC38E]">$ {liaoLatestTotal.toLocaleString('zh-TW')}</span>
+                    L: <span className="font-mono font-bold text-[#EFC38E]">$ {(Number(liaoLatestTotal) || 0).toLocaleString('zh-TW')}</span>
                   </div>
                   <div className="text-[11px] sm:text-xs text-white whitespace-nowrap">
-                    P: <span className="font-mono font-bold text-[#EFC38E]">$ {zhouLatestTotal.toLocaleString('zh-TW')}</span>
+                    P: <span className="font-mono font-bold text-[#EFC38E]">$ {(Number(zhouLatestTotal) || 0).toLocaleString('zh-TW')}</span>
                   </div>
                   
                   {/* 關閉按鈕 */}

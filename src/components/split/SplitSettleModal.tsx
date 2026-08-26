@@ -66,18 +66,18 @@ export const SplitSettleModal: React.FC<SplitSettleModalProps> = ({
             {/* Content (可滑動區域) */}
             <div className="p-5 sm:p-7 flex-1 overflow-y-auto space-y-4 text-xs text-[#6E6659]">
               <p className="leading-relaxed">
-                您即將結清目前所有 <strong>{summary.unsettledCount} 筆</strong> 待結算之代墊款項。確認後，系統將自動於 Google 試算表蓋印結清狀態，並將雙方債務歸零！
+                您即將結清目前所有 <strong>{summary?.unsettledCount || 0} 筆</strong> 待結算之代墊款項。確認後，系統將自動於 Google 試算表蓋印結清狀態，並將雙方債務歸零！
               </p>
 
               {/* 金額統計卡 */}
               <div className="p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200/80 text-center space-y-1">
                 <div className="text-[11px] font-bold text-emerald-800">
-                  {summary.netDebtor === 'none'
+                  {!summary || summary.netDebtor === 'none'
                     ? '目前無須返還款項'
                     : `應由 ${summary.netDebtor === '廖' ? '廖廖' : '周周'} 返還給 ${summary.netDebtor === '廖' ? '周周' : '廖廖'}`}
                 </div>
                 <div className="text-2xl sm:text-3xl font-black text-emerald-700">
-                  NT$ {summary.netAmount.toLocaleString()} 元
+                  NT$ {(Number(summary?.netAmount) || 0).toLocaleString()} 元
                 </div>
               </div>
 

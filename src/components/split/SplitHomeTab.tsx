@@ -28,8 +28,18 @@ interface SplitHomeTabProps {
   onOpenSettleModal: () => void;
 }
 
+const DEFAULT_SPLIT_SUMMARY: SplitSummary = {
+  zhouOwesLiao: 0,
+  liaoOwesZhou: 0,
+  netDebtor: 'none',
+  netAmount: 0,
+  summaryText: '目前雙方已結清 💖',
+  unsettledCount: 0,
+  settledCount: 0,
+};
+
 export const SplitHomeTab: React.FC<SplitHomeTabProps> = ({
-  summary,
+  summary = DEFAULT_SPLIT_SUMMARY,
   recentItems = [],
   isLoading,
   onRefresh,
@@ -38,7 +48,9 @@ export const SplitHomeTab: React.FC<SplitHomeTabProps> = ({
   onGoToSettlement,
   onOpenSettleModal,
 }) => {
-  const safeRecentItems = recentItems || [];
+  const safeSummary: SplitSummary = summary || DEFAULT_SPLIT_SUMMARY;
+  const safeRecentItems = Array.isArray(recentItems) ? recentItems.filter(Boolean) : [];
+
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-12 font-sans">
       {/* 頂部標題與快速更新列 */}
@@ -76,9 +88,9 @@ export const SplitHomeTab: React.FC<SplitHomeTabProps> = ({
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         className={`rounded-3xl p-5 sm:p-7 border shadow-md relative overflow-hidden transition-all ${
-          summary.netDebtor === 'none'
+          safeSummary.netDebtor === 'none'
             ? 'bg-gradient-to-br from-[#FFFDF9] via-[#FAF6EE] to-[#F3ECE0] border-[#E5DEC9]'
-            : summary.netDebtor === '廖'
+            : safeSummary.netDebtor === '廖'
             ? 'bg-gradient-to-br from-[#FFF5F3] via-[#FDF0EC] to-[#FAE4DC] border-rose-200 shadow-rose-100/50'
             : 'bg-gradient-to-br from-[#F3F9F6] via-[#ECF5F0] to-[#DFEFE6] border-emerald-200 shadow-emerald-100/50'
         }`}
@@ -93,9 +105,9 @@ export const SplitHomeTab: React.FC<SplitHomeTabProps> = ({
                 <ArrowRightLeft className="w-3 h-3 text-rose-500" />
                 <span>結算相抵結果</span>
               </span>
-              {summary.unsettledCount > 0 ? (
+              {(safeSummary.unsettledCount || 0) > 0 ? (
                 <span className="px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-900 border border-amber-500/30 text-[11px] font-bold">
-                  ⏳ 尚有 {summary.unsettledCount} 筆待結算
+                  ⏳ 尚有 {safeSummary.unsettledCount} 筆待結算
                 </span>
               ) : (
                 <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-900 border border-emerald-500/30 text-[11px] font-bold">
@@ -104,7 +116,7 @@ export const SplitHomeTab: React.FC<SplitHomeTabProps> = ({
               )}
             </div>
 
-            {summary.netDebtor === 'none' ? (
+            {safeSummary.netDebtor === 'none' ? (
               <div className="pt-2">
                 <h3 className="text-2xl sm:text-3xl font-black text-emerald-800 flex items-center gap-2">
                   目前雙方已結清 💖
@@ -117,16 +129,16 @@ export const SplitHomeTab: React.FC<SplitHomeTabProps> = ({
               <div className="pt-2 space-y-1">
                 <div className="text-xs sm:text-sm font-bold text-[#6E6659] flex items-center gap-2">
                   <span className="px-2 py-0.5 rounded-lg bg-white/90 text-[#3E3A36] border border-black/5 font-extrabold">
-                    {summary.netDebtor === '廖' ? '廖廖' : '周周'}
+                    {safeSummary.netDebtor === '廖' ? '廖廖' : '周周'}
                   </span>
                   <span>應返還給</span>
                   <span className="px-2 py-0.5 rounded-lg bg-white/90 text-[#3E3A36] border border-black/5 font-extrabold">
-                    {summary.netDebtor === '廖' ? '周周' : '廖廖'}
+                    {safeSummary.netDebtor === '廖' ? '周周' : '廖廖'}
                   </span>
                 </div>
                 <div className="text-3xl sm:text-4xl font-black tracking-tight text-rose-600 flex items-baseline gap-1.5 pt-1">
                   <span className="text-base sm:text-lg font-bold text-rose-800/80">NT$</span>
-                  <span>{summary.netAmount.toLocaleString()}</span>
+                  <span>{(safeSummary.netAmount || 0).toLocaleString()}</span>
                 </div>
                 <p className="text-xs text-[#8C8475] pt-0.5">
                   已自動抵銷雙方個別代墊之費用，直接依此淨額匯款即可平帳！
@@ -146,7 +158,7 @@ export const SplitHomeTab: React.FC<SplitHomeTabProps> = ({
               <span>新增代墊明細</span>
             </button>
 
-            {summary.unsettledCount > 0 && (
+            {(safeSummary.unsettledCount || 0) > 0 && (
               <button
                 type="button"
                 onClick={onOpenSettleModal}
@@ -171,10 +183,10 @@ export const SplitHomeTab: React.FC<SplitHomeTabProps> = ({
             <div>
               <div className="text-[11px] font-bold text-[#8C8475]">廖廖 先墊總額</div>
               <div className="text-lg sm:text-xl font-black text-[#3E3A36] mt-0.5">
-                NT$ {summary.zhouOwesLiao.toLocaleString()}
+                NT$ {(safeSummary.zhouOwesLiao || 0).toLocaleString()}
               </div>
               <div className="text-[10px] text-sky-700 font-medium">
-                {summary.zhouOwesLiao > 0 ? `周周 需返還 $${summary.zhouOwesLiao}` : '目前無待還'}
+                {(safeSummary.zhouOwesLiao || 0) > 0 ? `周周 需返還 $${(safeSummary.zhouOwesLiao || 0).toLocaleString()}` : '目前無待還'}
               </div>
             </div>
           </div>
@@ -194,10 +206,10 @@ export const SplitHomeTab: React.FC<SplitHomeTabProps> = ({
             <div>
               <div className="text-[11px] font-bold text-[#8C8475]">周周 先墊總額</div>
               <div className="text-lg sm:text-xl font-black text-[#3E3A36] mt-0.5">
-                NT$ {summary.liaoOwesZhou.toLocaleString()}
+                NT$ {(safeSummary.liaoOwesZhou || 0).toLocaleString()}
               </div>
               <div className="text-[10px] text-rose-700 font-medium">
-                {summary.liaoOwesZhou > 0 ? `廖廖 需返還 $${summary.liaoOwesZhou}` : '目前無待還'}
+                {(safeSummary.liaoOwesZhou || 0) > 0 ? `廖廖 需返還 $${(safeSummary.liaoOwesZhou || 0).toLocaleString()}` : '目前無待還'}
               </div>
             </div>
           </div>
@@ -215,7 +227,7 @@ export const SplitHomeTab: React.FC<SplitHomeTabProps> = ({
           <div className="flex items-center gap-2">
             <Clock className="w-4 h-4 text-[#8C8475]" />
             <h3 className="text-sm font-bold text-[#3E3A36]">近期代墊動態</h3>
-            <span className="text-xs text-[#A09A8F]">({recentItems.length} 筆)</span>
+            <span className="text-xs text-[#A09A8F]">({safeRecentItems.length} 筆)</span>
           </div>
 
           <button
@@ -238,7 +250,11 @@ export const SplitHomeTab: React.FC<SplitHomeTabProps> = ({
           <div className="space-y-2.5">
             {safeRecentItems.slice(0, 5).map((item) => {
               const isUnsettled = item.status === '未結清';
-              const debtorAmt = item.debtorAmount || (item.splitMode === 'AA平分' ? Math.round(item.totalAmount / 2) : item.totalAmount);
+              const totalAmt = Number(item.totalAmount) || 0;
+              const debtorAmt = Number(item.debtorAmount) || (item.splitMode === 'AA平分' ? Math.round(totalAmt / 2) : totalAmt);
+              const payerLabel = item.payer === '廖' ? '廖' : '周';
+              const debtorLabel = item.debtor || (item.payer === '廖' ? '周' : '廖');
+              const dateDisplay = item.time ? String(item.time).split(' ')[0] : '—';
               
               return (
                 <div
@@ -253,16 +269,16 @@ export const SplitHomeTab: React.FC<SplitHomeTabProps> = ({
                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-xs shrink-0 ${
                       item.payer === '廖' ? 'bg-sky-100 text-sky-800' : 'bg-rose-100 text-rose-800'
                     }`}>
-                      {item.payer === '廖' ? '廖' : '周'}
+                      {payerLabel}
                     </div>
 
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs sm:text-sm font-bold text-[#3E3A36] truncate">
-                          {item.itemName}
+                          {item.itemName || '未命名款項'}
                         </span>
                         <span className="px-2 py-0.5 rounded-md bg-white border border-[#E0DCD3] text-[10px] font-semibold text-[#7A7366]">
-                          {item.splitMode}
+                          {item.splitMode || 'AA平分'}
                         </span>
                         {isUnsettled ? (
                           <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-bold">
@@ -276,10 +292,10 @@ export const SplitHomeTab: React.FC<SplitHomeTabProps> = ({
                       </div>
 
                       <div className="text-[11px] text-[#8C8475] mt-0.5 flex items-center gap-2">
-                        <span>總額 ${item.totalAmount.toLocaleString()}</span>
+                        <span>總額 ${(Number(totalAmt) || 0).toLocaleString()}</span>
                         <span>•</span>
                         <span className="font-semibold text-rose-700">
-                          {item.debtor} 需返還 ${debtorAmt.toLocaleString()}
+                          {debtorLabel} 需返還 ${(Number(debtorAmt) || 0).toLocaleString()}
                         </span>
                         {item.note && (
                           <>
@@ -293,10 +309,10 @@ export const SplitHomeTab: React.FC<SplitHomeTabProps> = ({
 
                   <div className="text-right shrink-0">
                     <div className="text-xs sm:text-sm font-black text-[#3E3A36]">
-                      ${debtorAmt.toLocaleString()}
+                      ${(Number(debtorAmt) || 0).toLocaleString()}
                     </div>
                     <div className="text-[10px] text-[#A39E93] mt-0.5">
-                      {item.time.split(' ')[0]}
+                      {dateDisplay}
                     </div>
                   </div>
                 </div>

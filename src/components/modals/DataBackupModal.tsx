@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Database, Download, Upload, RefreshCw, CheckCircle, AlertTriangle, Trash2, Clock, Check, X, ShieldAlert, ArrowRight, Layers } from 'lucide-react';
-import { PendingSyncItem, getPendingQueue, clearSyncQueue, removeSyncItem, processSyncQueue } from '../../services/syncQueue';
+import { Database, Download, Upload, RefreshCw, CheckCircle, AlertTriangle, Check, X, ShieldAlert, ArrowRight, Layers } from 'lucide-react';
 import { RecordItem, ShoppingItem, SplitRecordItem, TravelTrip, TravelExpenseItem, TravelWishItem } from '../../types';
 
 interface DataBackupModalProps {
@@ -31,18 +30,11 @@ export const DataBackupModal: React.FC<DataBackupModalProps> = ({
   lastSyncedAt,
   isOnline
 }) => {
-  const [activeTab, setActiveTab] = useState<'backup' | 'queue' | 'reconcile'>('backup');
-  const [pendingQueue, setPendingQueue] = useState<PendingSyncItem[]>(() => getPendingQueue());
-  const [isProcessingQueue, setIsProcessingQueue] = useState(false);
+  const [activeTab, setActiveTab] = useState<'backup' | 'reconcile'>('backup');
   const [restoreJsonText, setRestoreJsonText] = useState('');
   const [restorePreview, setRestorePreview] = useState<any | null>(null);
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const [isRestoreSuccess, setIsRestoreSuccess] = useState(false);
-
-  // 刷新 queue
-  const refreshQueue = () => {
-    setPendingQueue(getPendingQueue());
-  };
 
   // 處理匯出備份 JSON
   const handleExportBackup = () => {
@@ -154,32 +146,6 @@ export const DataBackupModal: React.FC<DataBackupModalProps> = ({
     }
   };
 
-  // 處理離線佇列重試
-  const handleProcessQueue = async () => {
-    setIsProcessingQueue(true);
-    try {
-      const res = await processSyncQueue();
-      refreshQueue();
-      if (res.processed > 0) {
-        await onSyncAll();
-      }
-    } finally {
-      setIsProcessingQueue(false);
-    }
-  };
-
-  const handleClearAllQueue = () => {
-    if (window.confirm('確定要清空所有離線待傳項目嗎？這將放棄未上傳至 Google Sheet 的暫存修改。')) {
-      clearSyncQueue();
-      refreshQueue();
-    }
-  };
-
-  const handleRemoveSingleQueue = (id: string) => {
-    removeSyncItem(id);
-    refreshQueue();
-  };
-
   // 對帳與重複性檢查
   const duplicateRecords = React.useMemo(() => {
     const seen = new Map<string, RecordItem>();
@@ -214,13 +180,13 @@ export const DataBackupModal: React.FC<DataBackupModalProps> = ({
               </div>
               <div>
                 <h3 className="font-extrabold text-[#3E3A36] text-sm sm:text-base flex items-center gap-2">
-                  <span>資料備份、離線佇列與對帳中心</span>
+                  <span>資料備份與對帳中心</span>
                   <span className="text-[10px] text-blue-800 bg-blue-50 px-2 py-0.5 rounded-full font-bold border border-blue-200">
-                    雲端整合
+                    雲端與快照
                   </span>
                 </h3>
                 <p className="text-[11px] text-[#8C8475] font-medium">
-                  全量 JSON 資料匯出/還原、離線失敗重試佇列管理與資料一致性防呆
+                  全量 JSON 資料匯出/還原與 Google 試算表即時對帳
                 </p>
               </div>
             </div>
@@ -246,27 +212,6 @@ export const DataBackupModal: React.FC<DataBackupModalProps> = ({
             >
               <Download className="w-3.5 h-3.5" />
               <span>全量備份與還原</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab('queue');
-                refreshQueue();
-              }}
-              className={`px-3.5 py-2 text-xs font-bold rounded-t-xl transition-all flex items-center gap-1.5 cursor-pointer relative ${
-                activeTab === 'queue'
-                  ? 'bg-white text-amber-900 border-t border-x border-[#E8E4D9] shadow-2xs'
-                  : 'text-[#8C8475] hover:text-[#3E3A36]'
-              }`}
-            >
-              <Clock className="w-3.5 h-3.5" />
-              <span>離線待傳佇列</span>
-              {pendingQueue.length > 0 && (
-                <span className="bg-amber-500 text-white text-[9px] px-1.5 py-0.2 rounded-full font-bold">
-                  {pendingQueue.length}
-                </span>
-              )}
             </button>
 
             <button
@@ -303,185 +248,106 @@ export const DataBackupModal: React.FC<DataBackupModalProps> = ({
                     <button
                       type="button"
                       onClick={handleExportBackup}
-                      className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer flex items-center gap-1.5 active:scale-95 shrink-0"
+                      className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95 shrink-0"
                     >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>下載備份 JSON</span>
+                      <Download className="w-4 h-4" />
+                      <span>立即下載 JSON 備份檔</span>
                     </button>
                   </div>
                 </div>
 
                 {/* 還原卡片 */}
-                <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#E8E4D9] shadow-2xs space-y-3">
-                  <h4 className="text-xs font-extrabold text-[#3E3A36] flex items-center gap-1.5 border-b border-[#F2EDE1] pb-2">
-                    <Upload className="w-4 h-4 text-emerald-700" />
-                    <span>📤 從備份檔還原資料</span>
-                  </h4>
-                  <p className="text-[11px] text-[#8C8475]">
-                    選取過去下載的備份 JSON 檔案，系統將自動解析並合併至本機與雲端環境。
-                  </p>
+                <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#E8E4D9] shadow-2xs space-y-3.5">
+                  <div>
+                    <h4 className="text-xs font-extrabold text-[#3E3A36] flex items-center gap-1.5">
+                      <Upload className="w-4 h-4 text-amber-700" />
+                      <span>📤 自 JSON 備份檔還原資料</span>
+                    </h4>
+                    <p className="text-[11px] text-[#8C8475] mt-0.5">
+                      上傳先前匯出的備份檔案，可一次還原所有紀錄與分類
+                    </p>
+                  </div>
 
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <label className="flex-1 border-2 border-dashed border-[#DCD6C8] hover:border-blue-500 rounded-xl p-4 text-center cursor-pointer transition-all bg-[#FAF8F3]">
+                  <div className="flex flex-col sm:flex-row items-center gap-3">
+                    <label className="w-full sm:w-auto px-4 py-2.5 bg-[#FAF8F3] hover:bg-[#F2EDE1] text-[#3E3A36] border border-[#DDD8CC] rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-2xs">
+                      <Upload className="w-4 h-4 text-[#8C8475]" />
+                      <span>選擇備份檔案 (.json)</span>
                       <input
                         type="file"
-                        accept=".json"
+                        accept=".json,application/json"
                         onChange={handleFileSelect}
                         className="hidden"
                       />
-                      <Upload className="w-6 h-6 text-[#8C8475] mx-auto mb-1" />
-                      <span className="text-xs font-bold text-[#5C564E] block">點擊選取備份 .json 檔案</span>
-                      <span className="text-[10px] text-[#A69F91] block mt-0.5">支援全量快照還原</span>
                     </label>
+                    <span className="text-[11px] text-[#A39E93]">或貼上 JSON 內容進行預覽</span>
                   </div>
 
                   {restoreError && (
-                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                    <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-2">
+                      <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                       <span>{restoreError}</span>
                     </div>
                   )}
 
+                  {isRestoreSuccess && (
+                    <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2 font-bold animate-pulse">
+                      <Check className="w-4 h-4 shrink-0" />
+                      <span>🎉 資料已成功還原！畫面將即刻刷新。</span>
+                    </div>
+                  )}
+
                   {restorePreview && (
-                    <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-3.5 space-y-2.5">
+                    <div className="p-4 rounded-xl bg-blue-50/70 border border-blue-200 space-y-3">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
-                          <Check className="w-3.5 h-3.5 text-blue-700" />
+                          <Layers className="w-4 h-4 text-blue-700" />
                           <span>備份檔解析成功，待還原項目：</span>
                         </span>
-                        <span className="text-[10px] text-blue-700 font-mono">備份時間：{restorePreview.exportedAt.slice(0, 10)}</span>
+                        <span className="text-[10px] text-blue-800 font-mono">
+                          匯出時間：{new Date(restorePreview.exportedAt).toLocaleString()}
+                        </span>
                       </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
                         <div className="bg-white p-2 rounded-lg border border-blue-100">
-                          <span className="text-[10px] text-[#8C8475] block">記帳資料</span>
-                          <span className="text-xs font-bold text-[#3E3A36]">{restorePreview.recordsCount} 筆</span>
+                          <span className="text-[#8C8475] block text-[10px]">公積金紀錄</span>
+                          <span className="font-bold text-[#3E3A36] text-sm">{restorePreview.recordsCount} 筆</span>
                         </div>
                         <div className="bg-white p-2 rounded-lg border border-blue-100">
-                          <span className="text-[10px] text-[#8C8475] block">代墊借還</span>
-                          <span className="text-xs font-bold text-[#3E3A36]">{restorePreview.splitCount} 筆</span>
+                          <span className="text-[#8C8475] block text-[10px]">代墊借還</span>
+                          <span className="font-bold text-[#3E3A36] text-sm">{restorePreview.splitCount} 筆</span>
                         </div>
                         <div className="bg-white p-2 rounded-lg border border-blue-100">
-                          <span className="text-[10px] text-[#8C8475] block">採購清單</span>
-                          <span className="text-xs font-bold text-[#3E3A36]">{restorePreview.shoppingCount} 項</span>
+                          <span className="text-[#8C8475] block text-[10px]">心願與採購</span>
+                          <span className="font-bold text-[#3E3A36] text-sm">{restorePreview.shoppingCount} 項</span>
                         </div>
                         <div className="bg-white p-2 rounded-lg border border-blue-100">
-                          <span className="text-[10px] text-[#8C8475] block">旅遊行程</span>
-                          <span className="text-xs font-bold text-[#3E3A36]">{restorePreview.tripsCount} 個</span>
+                          <span className="text-[#8C8475] block text-[10px]">旅遊行程</span>
+                          <span className="font-bold text-[#3E3A36] text-sm">{restorePreview.tripsCount} 個</span>
                         </div>
                       </div>
 
-                      <div className="pt-2 flex justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setRestorePreview(null)}
-                          className="px-3 py-1.5 rounded-lg border border-[#DDD8CE] text-xs font-bold text-[#7A756E] hover:bg-[#EFECE6] cursor-pointer"
-                        >
-                          取消
-                        </button>
+                      <div className="pt-2 flex items-center justify-between border-t border-blue-200/60">
+                        <span className="text-[11px] text-rose-700 font-medium flex items-center gap-1">
+                          <ShieldAlert className="w-3.5 h-3.5" />
+                          <span>注意：還原將覆蓋現有本地暫存紀錄！</span>
+                        </span>
                         <button
                           type="button"
                           onClick={handleConfirmRestore}
-                          className="px-4 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                          className="px-4 py-1.5 bg-rose-700 hover:bg-rose-800 text-white rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center gap-1 cursor-pointer active:scale-95"
                         >
-                          <CheckCircle className="w-3.5 h-3.5" />
-                          <span>確認立即還原</span>
+                          <span>確認覆蓋並還原</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
                   )}
-
-                  {isRestoreSuccess && (
-                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 font-bold flex items-center gap-2">
-                      <CheckCircle className="w-4 h-4 text-emerald-600" />
-                      <span>🎉 資料還原成功！系統已重新整理。</span>
-                    </div>
-                  )}
                 </div>
               </div>
             )}
 
-            {/* 2. 離線待傳佇列 Tab */}
-            {activeTab === 'queue' && (
-              <div className="space-y-4">
-                <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#E8E4D9] shadow-2xs space-y-3.5">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-[#F2EDE1] pb-3">
-                    <div>
-                      <h4 className="text-xs font-extrabold text-[#3E3A36] flex items-center gap-1.5">
-                        <Clock className="w-4 h-4 text-amber-700" />
-                        <span>離線暫存與自動重試佇列</span>
-                      </h4>
-                      <p className="text-[11px] text-[#8C8475] mt-0.5">
-                        若於無網路或 GAS 連線超時下進行新增、修改或刪除，將暫存於此並在連網時自動重試
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handleProcessQueue}
-                        disabled={isProcessingQueue || pendingQueue.length === 0}
-                        className="px-3.5 py-1.5 bg-amber-700 hover:bg-amber-800 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
-                      >
-                        <RefreshCw className={`w-3.5 h-3.5 ${isProcessingQueue ? 'animate-spin' : ''}`} />
-                        <span>{isProcessingQueue ? '重送中...' : '立即重試全部'}</span>
-                      </button>
-
-                      {pendingQueue.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={handleClearAllQueue}
-                          className="px-3 py-1.5 border border-red-200 text-red-700 hover:bg-red-50 rounded-xl text-xs font-bold transition-all cursor-pointer"
-                        >
-                          清空佇列
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {pendingQueue.length === 0 ? (
-                    <div className="text-center py-10 space-y-2 text-[#9E978C]">
-                      <CheckCircle className="w-8 h-8 text-emerald-600 mx-auto" />
-                      <p className="text-xs font-bold text-[#3E3A36]">目前無任何待同步之離線操作</p>
-                      <p className="text-[11px] text-[#8C8475]">所有記帳與修改均已即時同步至本機與 Google 試算表</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2 divide-y divide-[#F5F3ED]">
-                      {pendingQueue.map((item) => (
-                        <div key={item.id} className="pt-2.5 first:pt-0 flex items-center justify-between gap-3">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-bold text-[#3E3A36] truncate">{item.description}</span>
-                              <span className="text-[10px] bg-amber-100 text-amber-900 px-1.5 py-0.2 rounded font-mono">
-                                {item.action}
-                              </span>
-                              {item.retryCount > 0 && (
-                                <span className="text-[10px] text-[#8C8475]">重試 {item.retryCount} 次</span>
-                              )}
-                            </div>
-                            <div className="text-[10px] text-[#8C8475] flex items-center gap-2 mt-0.5 font-mono">
-                              <span>時間：{new Date(item.timestamp).toLocaleTimeString()}</span>
-                              {item.lastError && (
-                                <span className="text-rose-600 truncate max-w-[240px]">錯誤：{item.lastError}</span>
-                              )}
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveSingleQueue(item.id)}
-                            className="p-1.5 hover:bg-red-50 text-[#A8A29E] hover:text-red-700 rounded-lg transition-colors cursor-pointer"
-                            title="移除此項待傳"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* 3. 對帳與資料診斷 Tab */}
+            {/* 2. 對帳與資料診斷 Tab */}
             {activeTab === 'reconcile' && (
               <div className="space-y-4">
                 <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#E8E4D9] shadow-2xs space-y-3.5">
@@ -492,7 +358,7 @@ export const DataBackupModal: React.FC<DataBackupModalProps> = ({
                         <span>資料完整性與防呆檢核</span>
                       </h4>
                       <p className="text-[11px] text-[#8C8475] mt-0.5">
-                        自動掃描同日同金額重複記帳、未平帳月份與離線衝突
+                        自動掃描同日同金額重複記帳與對帳狀態
                       </p>
                     </div>
                     <button
@@ -544,7 +410,7 @@ export const DataBackupModal: React.FC<DataBackupModalProps> = ({
                         {duplicateRecords.map((dup, idx) => (
                           <div key={idx} className="pt-1 first:pt-0 flex items-center justify-between text-amber-900">
                             <span>{dup.date} ｜ {dup.payer} ｜ {dup.item}</span>
-                            <span className="font-bold">NT$ {dup.amount.toLocaleString()}</span>
+                            <span className="font-bold">NT$ {(Number(dup.amount) || 0).toLocaleString()}</span>
                           </div>
                         ))}
                       </div>
@@ -553,20 +419,6 @@ export const DataBackupModal: React.FC<DataBackupModalProps> = ({
                 </div>
               </div>
             )}
-          </div>
-
-          {/* Footer */}
-          <div className="p-4 bg-white border-t border-[#E8E4D9] flex items-center justify-between shrink-0">
-            <span className="text-[11px] text-[#8C8475]">
-              ✨ 伴伴記支援本機自動備份與 Google 試算表雲端同步
-            </span>
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-6 py-2 bg-[#4D4942] hover:bg-[#322F2A] text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-2xs active:scale-95"
-            >
-              完成並關閉
-            </button>
           </div>
         </motion.div>
       </div>
